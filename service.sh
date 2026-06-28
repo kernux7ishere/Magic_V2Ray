@@ -319,9 +319,9 @@ do_job() {
             if [ "$STAT_XRAY_EXE" = "$STAT_XRAY_BIN" ]; then
                 kill -9 "$XRAY_PID"
             fi
-            rm -f "$PIDFILE"
             XRAY_PID=0
         fi
+        rm -f "$PIDFILE"
     fi
     if [ "$content" = "start_monitor" ]; then
         [ $MONITOR_PID -gt 0 ] && kill -9 "$MONITOR_PID"

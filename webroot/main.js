@@ -144,7 +144,10 @@ async function toggleService(action) {
                 const xrayConfig = _resolveXrayConfig(node.rawUri);
                 execShell(`echo '${xrayConfig}' > '${CONFIG_JSON}'`, () => {
                     execShell(`sh ${MODDIR}/proxy_control.sh restart`, () => {
-                        updateStatusDisplay();      
+                        const badge = document.getElementById('service-status');
+                        badge.innerText = t('status_loading');
+                        badge.className = 'status-badge active';
+                        setTimeout(updateStatusDisplay, 1200);
                     });
                 });
             }

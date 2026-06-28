@@ -21,9 +21,13 @@ get_status() {
         STAT_XRAY_BIN=$(stat -L -c "%D:%i" "$MODDIR/bin/xray")
 
         if kill -0 "$PID" 2>/dev/null && [ "$STAT_XRAY_EXE" = "$STAT_XRAY_BIN" ]; then
+            echo "running"
             return 0
         fi
+        echo "crashed"
+        return 2
     fi
+    echo "stopped"
     return 1
 }
 
@@ -52,11 +56,5 @@ case "$1" in
     start) start_proxy ;;
     stop) stop_proxy; rm -rf "$DATADIR/config.json" ;;
     restart) stop_proxy; sleep 1; start_proxy ;;
-    status)
-        if get_status; then
-            echo "running"
-        else
-            echo "stopped"
-        fi
-        ;;
+    status) get_status ;;
 esac
