@@ -25,6 +25,7 @@ Nếu bạn đã quen dùng các app V2Ray thông thường (như v2rayNG, Matsu
   + **Không bị nghẽn cổ chai hành đợi:** Lớp `VpnService` của Android quản lý tất cả các ứng dụng qua một cổng kiểm soát duy nhất do hệ thống phân phối. Khi bạn tải nặng (vừa xem video 4K vừa download), lớp này rất dễ bị nghẽn cổ chai (bottleneck) do hàng đợi của Java không xử lý kịp tốc độ đổ về của gói tin. Magic V2Ray chia tách và giải phóng traffic trực tiếp từ tầng Mangle ngay khi gói tin vừa được sinh ra, giúp băng thông được giải thoát tối đa.
   + **Tối ưu hóa xử lý gói tin:** Vì không phải đi qua một lớp VPN "ảo ảnh" bọc ngoài của hệ thống, độ trễ Ping (Latency) và thời gian thiết lập kết nối TCP ban đầu (Handshake) sẽ giảm đi vài miligiây. Gói tin đi thẳng, không bị xé nhỏ hay nhồi thêm các header quản lý VPN của Android Framework.
 - **Chuyển mạng động không độ trễ:** Tự động phát hiện ngay lập tức khi bạn chuyển đổi qua lại giữa Wi-Fi và 4G/5G, tự động làm mới (Hot-reload) các quy tắc định tuyến tường lửa ngay trong nhân hệ điều hành, loại bỏ hoàn toàn tình trạng đơ mạng từ 5 đến 10 giây giống như các app VPN thông thường.
+- **Chia sẻ Hotspot thông minh tích hợp sẵn:** Các ứng dụng VPN thông thường không thể chia sẻ mạng proxy qua WiFi Hotspot vì Android điều hướng lưu lượng của máy con qua một không gian mạng riêng biệt tách biệt khỏi `VpnService`. Magic V2Ray can thiệp trực tiếp vào tầng Netfilter (`PREROUTING`) của nhân Linux, tự động thiết lập các cấu hình `iptables`/`ip6tables` và `ip rule` để hút toàn bộ lưu lượng từ các máy kết nối WiFi vào lõi `xraytun0`. Bạn có thể dễ dàng chia sẻ mạng 4G/5G bypass cho máy tính, console hoặc điện thoại khác mà không cần cài thêm app kích tethering bên thứ ba.
 - **Hỗ trợ Root toàn diện:** Hoạt động hoàn hảo và mượt mà trên cả 3 nền tảng Root phổ biến hiện nay bao gồm Magisk, KernelSU, và APatch.
 
 ---
@@ -45,6 +46,7 @@ Nếu thiết bị của bạn chưa được root, hoặc bạn đang tìm ki�
 - **Nhập liên kết thông minh (Smart Link Import):** Dễ dàng dán các URL đăng ký, các chuỗi cấu hình thô hoặc các đoạn mã văn bản hỗn hợp.
 - **Cập nhật tự động với 1-Click (One-Click Auto-Reload):** Lưu lại các liên kết đăng ký để bạn có thể cập nhật toàn bộ danh mục chỉ bằng một lần chạm.
 - **Không tốn pin (No Battery Drain):** Cơ chế xử lý gốc dưới nền đảm bảo thời lượng pin của bạn kéo dài hơn nhiều so với việc chạy các ứng dụng VPN độc lập nặng nề.
+- **Phát mạng Hotspot Native:** Chia sẻ kết nối proxy đã được bảo mật hoặc bypass cho các thiết bị khác qua Wi-Fi Hotspot với đầy đủ hỗ trợ định tuyến cho cả IPv4 và IPv6.
 
 ---
 

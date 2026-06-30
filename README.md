@@ -27,6 +27,7 @@ If you are used to standard V2Ray apps (like v2rayNG, Matsuri, Nekobox), here is
   + **No Single-Queue Bottleneck:** Android's `VpnService` manages all application traffic through a single, system-allocated queue. Under heavy load (e.g., streaming 4K video while downloading), this Java-managed queue quickly bottlenecks. Magic V2Ray splits traffic efficiently at the Netfilter/Mangle layer based on specific application profiles, unleashing packets the millisecond they are generated and unlocking maximum bandwidth.
   + **Optimized Packet Handling:** Without a virtual VPN wrapper, connection latency (Ping) and initial TCP Handshake times are slashed by several milliseconds. Packets travel directly without being fragmented or bloated by the Android framework's VPN management headers.
 - **Seamless Dynamic Reconnects:** Instantly detects when you switch between Wi-Fi and 4G/5G, hot-reloading the firewall routing rules directly in the kernel without the typical 5-to-10 second connection freeze found in standard user-space VPN apps.
+- **Built-in Smart Hotspot Sharing:** Standard VPN apps fail to share proxy connections via Wi-Fi Hotspot because Android routes tethered traffic through a separate network namespace that bypasses the `VpnService`. Magic V2Ray natively intercepts hotspot traffic at the Netfilter layer (`PREROUTING`). It injects custom `iptables`/`ip6tables` and `ip rule` structures to seamlessly force connected clients into the `xraytun0` core, allowing you to share your bypassed 4G/5G connection without any extra tethering apps.
 - **Universal Root Support:** Works flawlessly out-of-the-box across Magisk, KernelSU, and APatch, fitting perfectly into modern Android root environments.
 
 ---
@@ -47,6 +48,7 @@ If your device is not rooted, or if you are looking for a regular GUI applicatio
 - **Smart Link Import:** Easily paste subscription URLs, raw configuration strings, or mixed text codes.
 - **One-Click Auto-Reload:** Saves your subscription links so you can update an entire category with a single tap.
 - **No Battery Drain:** Native background processing ensures your battery lasts much longer compared to running heavy standalone VPN apps.
+- **Native Hotspot Tethering:** Share your secured and bypassed proxy connection to laptops, consoles, or other phones via Wi-Fi Hotspot with full IPv4 and IPv6 routing support.
 
 
 **Note:** Magisk users need to install [KsuWebUIStandalone](https://github.com/5ec1cff/KsuWebUIStandalone/releases/tag/v1.0) to open WebUI of the module
