@@ -443,50 +443,51 @@ function convert_uri_to_xray_json(uri, optional_settings) {
             const u = new URL(fakeHttpUri);
             const p = new URLSearchParams(u.search);
 
-            const hy2Server = {
+            // Xray-core's "settings" block for protocol "hysteria" only carries
+            // the connection target — auth/bandwidth/masquerade live under
+            // streamSettings.hysteriaSettings instead.
+            const hy2Settings = {
+                version: 2,
                 address: u.hostname,
                 port: +u.port || 443
             };
-            // Port hopping: mport param (e.g. "20000-30000")
-            if (p.get('mport')) {
-                hy2Server.ports = p.get('mport');
-            }
 
-            const hy2Settings = {
-                servers: [hy2Server],
+            const hySettings = {
+                version: 2,
                 auth: decodeURIComponent(u.username)
             };
-            // hopInterval (seconds) for port hopping
-            if (p.get('hopInterval')) {
-                hy2Settings.hopInterval = parseInt(p.get('hopInterval')) || 30;
-            }
-            // Bandwidth hints
+            // udpIdleTimeout must be 2-600s if present; default matches Xray's own default of 60
+            const udpIdleTimeout = parseInt(p.get('udpIdleTimeout')) || 60;
+            hySettings.udpIdleTimeout = Math.min(600, Math.max(2, udpIdleTimeout));
+            // Bandwidth hints (Xray expects strings like "100 mbps")
             if (p.get('down') || p.get('bandwidth')) {
-                hy2Settings.downlinkCapacity = p.get('down') || p.get('bandwidth');
+                hySettings.down = p.get('down') || p.get('bandwidth');
             }
             if (p.get('up')) {
-                hy2Settings.uplinkCapacity = p.get('up');
+                hySettings.up = p.get('up');
+            }
+            // Port hopping: mport param carries the range (e.g. "20000-30000")
+            if (p.get('mport')) {
+                hySettings.udphop = {
+                    port: p.get('mport'),
+                    interval: parseInt(p.get('hopInterval')) || 30
+                };
             }
 
             outbound = {
                 tag: "proxy",
-                protocol: "hysteria2",
+                protocol: "hysteria",
                 settings: hy2Settings,
                 streamSettings: {
-                    network: "udp",
+                    network: "hysteria",
                     security: "tls",
                     tlsSettings: {
                         serverName: p.get('sni') || u.hostname
                     },
+                    hysteriaSettings: hySettings,
                     sockopt: { mark: 255, "dialerProxy": "direct" }
                 }
             };
-            if (p.get('obfs') && p.get('obfs') !== 'none') {
-                outbound.settings.obfs = {
-                    type: p.get('obfs'),
-                    password: p.get('obfs-password') || ""
-                };
-            }
         }
         else if (uri.startsWith('socks://') || uri.startsWith('socks5://')) {
             // Fix parser on old Chrome
@@ -921,26 +922,25 @@ function convert_outbound_to_uri(outbound) {
             return `wireguard://${secretKey}@${wgHost}:${wgPort}/?${queryStr}#${pct(nodeTag)}`;
         }
 
-        if (proto === 'hysteria2') {
-            const cfg = outbound.settings;
-            const srv = (cfg.servers || [])[0] || {};
+        if (proto === 'hysteria' || proto === 'hysteria2') {
+            const cfg = outbound.settings || {};
             const tls = ss.tlsSettings || {};
+            const hy  = ss.hysteriaSettings || {};
 
             const q = {};
             if (tls.serverName) q.sni = tls.serverName;
-            if (srv.ports)      q.mport = srv.ports;
-            if (cfg.downlinkCapacity) q.down = cfg.downlinkCapacity;
-            if (cfg.uplinkCapacity)   q.up   = cfg.uplinkCapacity;
-            if (cfg.hopInterval)      q.hopInterval = cfg.hopInterval;
-            if (cfg.obfs) {
-                q.obfs = cfg.obfs.type || 'salamander';
-                q['obfs-password'] = cfg.obfs.password || '';
+            if (hy.down) q.down = hy.down;
+            if (hy.up)   q.up   = hy.up;
+            if (hy.udpIdleTimeout) q.udpIdleTimeout = hy.udpIdleTimeout;
+            if (hy.udphop) {
+                q.mport = hy.udphop.port;
+                if (hy.udphop.interval) q.hopInterval = hy.udphop.interval;
             }
 
             const queryStr = buildQuery(q);
             const nodeTag  = 'Hysteria2 Node';
-            const auth     = pct(cfg.auth || '');
-            return `hy2://${auth}@${srv.address}:${srv.port}?${queryStr}#${pct(nodeTag)}`;
+            const auth     = pct(hy.auth || '');
+            return `hy2://${auth}@${cfg.address}:${cfg.port}?${queryStr}#${pct(nodeTag)}`;
         }
 
         if (proto === 'socks') {
