@@ -35,7 +35,7 @@ start_proxy() {
     fi
 
     # Start xray core and tun2socks in the background
-    echo start > "$PIPE_FILE"
+    echo "start" > "$PIPE_FILE"
     echo "wait" > "$PIPE_FILE"
 
     echo "Proxy core successfully running!"
@@ -49,9 +49,15 @@ stop_proxy() {
     echo "Proxy core successfully stopped!"
 }
 
+reapply() {
+    echo "apply_cur_iface" > "$PIPE_FILE"
+    echo "wait" > "$PIPE_FILE"
+}
+
 case "$1" in
     start) start_proxy ;;
     stop) stop_proxy; rm -rf "$DATADIR/config.json" ;;
     restart) stop_proxy; sleep 1; start_proxy ;;
     status) get_status ;;
+    reapply) reapply ;;
 esac

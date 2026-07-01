@@ -133,6 +133,7 @@ function updateStatusDisplay() {
  
 async function toggleService(action) {
     if (action === 'start' || action === 'restart') {
+        toggleService('reapply'); // Ensure the current network interface is applied before starting/restarting
         if (activeConfig) {
             const checkCmd = "/system/bin/ip route get 8.8.8.8 mark 255";
             const currentRoute = await execShellAsync(checkCmd);

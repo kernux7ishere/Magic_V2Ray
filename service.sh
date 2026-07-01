@@ -331,6 +331,15 @@ do_job() {
     if [ "$content" = "wait" ]; then
         : # Do nothing
     fi
+    if [ "$content" = "apply_cur_iface" ]; then
+        local cur_iface=$(get_active_interface)
+        if [ ! -z "$cur_iface" ]; then
+            echo "Applying routing rules for current active interface: $cur_iface"
+            apply_mark_rule "$cur_iface"
+        else
+            echo "No active interface detected to apply routing rules."
+        fi
+    fi
     if [ "$content" = "start" ]; then
         if is_proc_running "xray"; then
             echo "Xray is already running with PID $XRAY_PID"
