@@ -173,6 +173,84 @@ monitor_net_interfaces() {
     done
 }
 
+apply_routing_rules() {
+    local retry=0
+    local max_retry=10
+    while [ $retry -lt $max_retry ]; do
+        if $ip link show "xraytun0" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.5
+        retry=$((retry + 1))
+    done
+
+    # Capture all traffic to tun device and redirect to xray core
+    # Lock down xraytun
+    lock_xraytun0
+
+    # IPV4
+    # STEP 1: Create tun device and assign IP address
+    $ip addr add 198.18.0.1/15 dev xraytun0
+    $ip link set dev xraytun0 up
+    $ip route replace default dev xraytun0 table 100
+    # STEP 2: Add routing rule to route marked packets through the tun device
+    $ip rule add fwmark 1 table 100 priority 1010
+    # STEP 3: Add iptables rules to mark packets from tun2socks and route them through the tun device
+    $iptables -t mangle -N XRAY_MARK
+    $iptables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+    $iptables -t mangle -A OUTPUT -j XRAY_MARK 
+    # IPv4 Hotspot support
+    # STEP 1: Allow forward traffic between hotspot interfaces and xraytun0
+    $iptables -I FORWARD -o xraytun0 -j ACCEPT
+    $iptables -I FORWARD -i xraytun0 -j ACCEPT
+    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    # STEP 2: Force hotspot private IP ranges to lookup table 100
+    $ip rule add iif lo goto 6000 pref 5000
+    $ip rule add iif xraytun0 lookup main suppress_prefixlength 0 pref 5010
+    $ip rule add iif xraytun0 goto 6000 pref 5020
+    # * Bypass LAN
+    $ip rule add to 10.0.0.0/8 lookup main pref 5025
+    $ip rule add to 172.16.0.0/12 lookup main pref 5026
+    $ip rule add to 192.168.0.0/16 lookup main pref 5027
+    # * Redirect to xraytun0
+    $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
+    $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
+    $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
+    $ip rule add nop pref 6000
+    # STEP 3: Adjust TCPMSS to prevent TLS packet fragmentation overhead
+    $iptables -t mangle -I FORWARD -o xraytun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
+    # Hide proxy from apps
+    $iptables -I OUTPUT -p tcp --dport 808 -d 127.17.1.3 -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
+
+    # IPV6
+    # STEP 1: Create tun device and assign IP address
+    $ip -6 addr add fdfe:dcba:9876::1/64 dev xraytun0
+    $ip -6 route replace default dev xraytun0 table 100
+    # STEP 2: Add routing rule to route marked packets through the tun device
+    $ip -6 rule add fwmark 1 table 100 priority 1010
+    # STEP 3: Add ip6tables rules to mark packets from tun2socks and route them through the tun device
+    $ip6tables -t mangle -N XRAY_MARK
+    $ip6tables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
+    # IPv6 Hotspot support
+    $ip6tables -I FORWARD -i xraytun0 -j ACCEPT
+    $ip6tables -I FORWARD -o xraytun0 -j ACCEPT
+    $ip6tables -t mangle -I PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -I PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d ::1/128 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fe80::/10 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fc00::/7 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -j MARK --set-xmark 1
+}
+
 clear_routing_rules() {
     # IPv4
     $iptables -t mangle -D OUTPUT -j XRAY_MARK
@@ -233,81 +311,7 @@ do_job() {
             echo "$XRAY_PID" > "$PIDFILE"
             echo "Xray is running with PID $XRAY_PID"
 
-            local retry=0
-            local max_retry=10
-            while [ $retry -lt $max_retry ]; do
-                if $ip link show "xraytun0" >/dev/null 2>&1; then
-                    break
-                fi
-                sleep 0.5
-                retry=$((retry + 1))
-            done
-
-            # Capture all traffic to tun device and redirect to xray core
-            # Lock down xraytun
-            lock_xraytun0
-
-            # IPV4
-            # STEP 1: Create tun device and assign IP address
-            $ip addr add 198.18.0.1/15 dev xraytun0
-            $ip link set dev xraytun0 up
-            $ip route replace default dev xraytun0 table 100
-            # STEP 2: Add routing rule to route marked packets through the tun device
-            $ip rule add fwmark 1 table 100 priority 1010
-            # STEP 3: Add iptables rules to mark packets from tun2socks and route them through the tun device
-            $iptables -t mangle -N XRAY_MARK
-            $iptables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
-            $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
-            $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
-            $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
-            $iptables -t mangle -A OUTPUT -j XRAY_MARK 
-            # IPv4 Hotspot support
-            # STEP 1: Allow forward traffic between hotspot interfaces and xraytun0
-            $iptables -I FORWARD -o xraytun0 -j ACCEPT
-            $iptables -I FORWARD -i xraytun0 -j ACCEPT
-            $iptables -I PREROUTING -t nat ! -i xraytun0 -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
-            $iptables -I PREROUTING -t nat ! -i xraytun0 -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
-            $iptables -I PREROUTING -t nat ! -i xraytun0 -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
-            # STEP 2: Force hotspot private IP ranges to lookup table 100
-            $ip rule add iif lo goto 6000 pref 5000
-            $ip rule add iif xraytun0 lookup main suppress_prefixlength 0 pref 5010
-            $ip rule add iif xraytun0 goto 6000 pref 5020
-            # * Bypass LAN
-            $ip rule add to 10.0.0.0/8 lookup main pref 5025
-            $ip rule add to 172.16.0.0/12 lookup main pref 5026
-            $ip rule add to 192.168.0.0/16 lookup main pref 5027
-            # * Redirect to xraytun0
-            $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
-            $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
-            $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
-            $ip rule add nop pref 6000
-            # STEP 3: Adjust TCPMSS to prevent TLS packet fragmentation overhead
-            $iptables -t mangle -I FORWARD -o xraytun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
-            # Hide proxy from apps
-            $iptables -I OUTPUT -p tcp --dport 808 -d 127.17.1.3 -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
-
-            # IPV6
-            # STEP 1: Create tun device and assign IP address
-            $ip -6 addr add fdfe:dcba:9876::1/64 dev xraytun0
-            $ip -6 route replace default dev xraytun0 table 100
-            # STEP 2: Add routing rule to route marked packets through the tun device
-            $ip -6 rule add fwmark 1 table 100 priority 1010
-            # STEP 3: Add ip6tables rules to mark packets from tun2socks and route them through the tun device
-            $ip6tables -t mangle -N XRAY_MARK
-            $ip6tables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
-            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
-            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
-            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
-            $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
-            # IPv6 Hotspot support
-            $ip6tables -I FORWARD -i xraytun0 -j ACCEPT
-            $ip6tables -I FORWARD -o xraytun0 -j ACCEPT
-            $ip6tables -t mangle -I PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
-            $ip6tables -t mangle -I PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
-            $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d ::1/128 -j RETURN
-            $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fe80::/10 -j RETURN
-            $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fc00::/7 -j RETURN
-            $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -j MARK --set-xmark 1
+            apply_routing_rules
         fi
     fi
     if [ "$content" = "stop" ]; then
