@@ -45,7 +45,9 @@ ip6tables="/system/bin/ip6tables"
 
 RULE_PRIORITY=1000
 FWMARK=255
-LOCKED=0
+TUN_NAME="xraytun0"
+TUN_ADDR="127.17.1.3"
+TUN_PORT="808"
 
 get_status() {
     if [ -f "$PIDFILE" ]; then
@@ -80,10 +82,8 @@ lock_sysctl() {
 }
 
 lock_xraytun0() {
-    [ $LOCKED = 1 ] && return
-    if [ -e "/proc/sys/net/ipv4/conf/xraytun0/rp_filter" ]; then
-        LOCKED=1
-        lock_sysctl "0" "/proc/sys/net/ipv4/conf/xraytun0/rp_filter"
+    if [ -e "/proc/sys/net/ipv4/conf/$TUN_NAME/rp_filter" ]; then
+        echo "0" > "/proc/sys/net/ipv4/conf/$TUN_NAME/rp_filter"
     fi
 }
 
@@ -133,7 +133,7 @@ apply_mark_rule() {
     [ -z "$iface_index" ] && return 1
 
     $ip rule add fwmark $FWMARK table "$iface_index" priority $RULE_PRIORITY
-    $ip -6 rule add fwmark 255 table "$iface_index" priority $RULE_PRIORITY
+    $ip -6 rule add fwmark $FWMARK table "$iface_index" priority $RULE_PRIORITY
     echo "Applied: fwmark $FWMARK -> table $iface_index ($iface)"
 }
 
@@ -178,7 +178,7 @@ apply_routing_rules() {
     local retry=0
     local max_retry=10
     while [ $retry -lt $max_retry ]; do
-        if $ip link show "xraytun0" >/dev/null 2>&1; then
+        if $ip link show "$TUN_NAME" >/dev/null 2>&1; then
             break
         fi
         sleep 0.5
@@ -191,65 +191,65 @@ apply_routing_rules() {
 
     # IPV4
     # STEP 1: Create tun device and assign IP address
-    $ip addr add 198.18.0.1/15 dev xraytun0
-    $ip link set dev xraytun0 up
-    $ip route replace default dev xraytun0 table 100
+    $ip addr add 198.18.0.1/15 dev $TUN_NAME
+    $ip link set dev $TUN_NAME up
+    $ip route replace default dev $TUN_NAME table 100
     # STEP 2: Add routing rule to route marked packets through the tun device
     $ip rule add fwmark 1 table 100 priority 1010
     # STEP 3: Add iptables rules to mark packets from tun2socks and route them through the tun device
     $iptables -t mangle -N XRAY_MARK
-    $iptables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
     $iptables -t mangle -A OUTPUT -j XRAY_MARK 
     # IPv4 Hotspot support
-    # STEP 1: Allow forward traffic between hotspot interfaces and xraytun0
-    $iptables -I FORWARD -o xraytun0 -j ACCEPT
-    $iptables -I FORWARD -i xraytun0 -j ACCEPT
-    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -I PREROUTING -t nat ! -i xraytun0 -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    # STEP 1: Allow forward traffic between hotspot interfaces and $TUN_NAME
+    $iptables -I FORWARD -o $TUN_NAME -j ACCEPT
+    $iptables -I FORWARD -i $TUN_NAME -j ACCEPT
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
     # STEP 2: Force hotspot private IP ranges to lookup table 100
     $ip rule add iif lo goto 6000 pref 5000
-    $ip rule add iif xraytun0 lookup main suppress_prefixlength 0 pref 5010
-    $ip rule add iif xraytun0 goto 6000 pref 5020
+    $ip rule add iif $TUN_NAME lookup main suppress_prefixlength 0 pref 5010
+    $ip rule add iif $TUN_NAME goto 6000 pref 5020
     # * Bypass LAN
     $ip rule add to 10.0.0.0/8 lookup main pref 5025
     $ip rule add to 172.16.0.0/12 lookup main pref 5026
     $ip rule add to 192.168.0.0/16 lookup main pref 5027
-    # * Redirect to xraytun0
+    # * Redirect to $TUN_NAME
     $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
     $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
     $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
     $ip rule add nop pref 6000
     # STEP 3: Adjust TCPMSS to prevent TLS packet fragmentation overhead
-    $iptables -t mangle -I FORWARD -o xraytun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
+    $iptables -t mangle -I FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
     # Hide proxy from apps
-    $iptables -I OUTPUT -p tcp --dport 808 -d 127.17.1.3 -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
+    $iptables -I OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
 
     # IPV6
     # STEP 1: Create tun device and assign IP address
-    $ip -6 addr add fdfe:dcba:9876::1/64 dev xraytun0
-    $ip -6 route replace default dev xraytun0 table 100
+    $ip -6 addr add fdfe:dcba:9876::1/64 dev $TUN_NAME
+    $ip -6 route replace default dev $TUN_NAME table 100
     # STEP 2: Add routing rule to route marked packets through the tun device
     $ip -6 rule add fwmark 1 table 100 priority 1010
     # STEP 3: Add ip6tables rules to mark packets from tun2socks and route them through the tun device
     $ip6tables -t mangle -N XRAY_MARK
-    $ip6tables -t mangle -A XRAY_MARK -m mark --mark 255 -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
     $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
     # IPv6 Hotspot support
-    $ip6tables -I FORWARD -i xraytun0 -j ACCEPT
-    $ip6tables -I FORWARD -o xraytun0 -j ACCEPT
+    $ip6tables -I FORWARD -i $TUN_NAME -j ACCEPT
+    $ip6tables -I FORWARD -o $TUN_NAME -j ACCEPT
     $ip6tables -t mangle -I PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
     $ip6tables -t mangle -I PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d ::1/128 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i xraytun0 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
+    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
 }
 
 clear_routing_rules() {
@@ -258,7 +258,7 @@ clear_routing_rules() {
     $iptables -t mangle -F XRAY_MARK
     $iptables -t mangle -X XRAY_MARK
     $ip rule del fwmark 1 table 100 priority 1010
-    $iptables -D OUTPUT -p tcp --dport 808 -d 127.17.1.3 -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
+    $iptables -D OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
     # IPv4 hotspot
     $ip rule del pref 5000
     $ip rule del pref 5010
@@ -270,29 +270,29 @@ clear_routing_rules() {
     $ip rule del pref 5040
     $ip rule del pref 5050
     $ip rule del pref 6000
-    $iptables -D FORWARD -o xraytun0 -j ACCEPT
-    $iptables -D FORWARD -i xraytun0 -j ACCEPT
-    $iptables -D PREROUTING -t nat ! -i xraytun0 -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -D PREROUTING -t nat ! -i xraytun0 -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -D PREROUTING -t nat ! -i xraytun0 -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -t mangle -D FORWARD -o xraytun0 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
+    $iptables -D FORWARD -o $TUN_NAME -j ACCEPT
+    $iptables -D FORWARD -i $TUN_NAME -j ACCEPT
+    $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -t mangle -D FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
     # IPv6
     $ip6tables -t mangle -D OUTPUT -j XRAY_MARK
     $ip6tables -t mangle -F XRAY_MARK
     $ip6tables -t mangle -X XRAY_MARK
     $ip -6 rule del fwmark 1 table 100 priority 1010
     # IPv6 hotspot
-    $ip6tables -D FORWARD -i xraytun0 -j ACCEPT
-    $ip6tables -D FORWARD -o xraytun0 -j ACCEPT
+    $ip6tables -D FORWARD -i $TUN_NAME -j ACCEPT
+    $ip6tables -D FORWARD -o $TUN_NAME -j ACCEPT
     $ip6tables -t mangle -D PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
     $ip6tables -t mangle -D PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -D PREROUTING ! -i xraytun0 -d ::1/128 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i xraytun0 -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i xraytun0 -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i xraytun0 -j MARK --set-xmark 1
+    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
+    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
+    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
+    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
 
     # Down the tun device
-    $ip link set dev xraytun0 down
+    $ip link set dev $TUN_NAME down
 }
 
 mount_proc_with_name() {
@@ -405,7 +405,25 @@ if [ ! -e /dev/net/tun ]; then
 fi
 
 # Start hev-socks5-tunnel
-"$BINDIR/hev-socks5-tunnel" "$MODDIR/tunnel.yml" </dev/null &>"$TUN2SOCKS_LOG" &
+cat <<EOF  >"$STUB_DIR/run/tunnel.yml"
+tunnel:
+  name: $TUN_NAME
+  mtu: 8500
+  ipv4: 198.18.0.1
+  ipv6: fdfe:dcba:9876::1
+
+socks5:
+  address: $TUN_ADDR
+  port: $TUN_PORT
+  udp: 'udp'
+  mark: $FWMARK
+
+misc:
+  log-file: stderr
+  log-level: warn
+EOF
+
+"$BINDIR/hev-socks5-tunnel" "$STUB_DIR/run/tunnel.yml" </dev/null &>"$TUN2SOCKS_LOG" &
 TUN2SOCKS_PID=$!
 echo "hev-socks5-tunnel is running with PID $TUN2SOCKS_PID"
 
