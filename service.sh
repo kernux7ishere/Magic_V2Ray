@@ -355,7 +355,7 @@ do_job() {
         fi
     fi
     if [ "$content" = "stop" ]; then
-        clear_routing_rules
+        clear_routing_rules 2>/dev/null
 
         if is_proc_running "xray"; then
             kill -9 "$XRAY_PID"
