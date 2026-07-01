@@ -20,9 +20,10 @@ grep_prop() {
 rm -rf "$DATADIR/xray.log"
 rm -rf "$DATADIR/tun2socks.log"
 XRAY_LOG="$DATADIR/xray.log"
-TUN2SOCKS_LOG="$DATADIR/tun2socks.log"
+TUN2SOCKS_LOG=/dev/null
 if [ "$(grep_prop debug)" = "1" ]; then
     set -x
+    TUN2SOCKS_LOG="$DATADIR/tun2socks.log"
 fi
 exec > "$DATADIR/service.log" 2>&1
 
@@ -294,15 +295,41 @@ clear_routing_rules() {
     $ip link set dev xraytun0 down
 }
 
+mount_proc_with_name() {
+    local PID="$1"
+    local NAME="$2"
+    if [ -d "/proc/$PID" ] && [ ! -e "$STUB_DIR/proc/$NAME" ]; then
+        mkdir -p "$STUB_DIR/proc/$NAME"
+        mount --bind "/proc/$PID" "$STUB_DIR/proc/$NAME"
+        echo "Mounted /proc/$PID to $STUB_DIR/proc/$NAME"
+    fi
+}
+
+umount_proc_with_name() {
+    local NAME="$1"
+    umount -l "$STUB_DIR/proc/$NAME" 2>/dev/null || true
+    rm -rf "$STUB_DIR/proc/$NAME"
+    echo "Unmounted $STUB_DIR/proc/$NAME"
+}
+
+is_proc_running() {
+    local NAME="$1"
+    if [ -e "$STUB_DIR/proc/$NAME/exe" ]; then
+        return 0
+    else
+        # When the process is dead, stat $STUB_DIR/proc/$NAME will fail
+        # as well as anything inside it, so we can safely assume that the process is not running.
+        return 1
+    fi
+}
+
 do_job() {
     local content="$1"
     if [ "$content" = "wait" ]; then
         : # Do nothing
     fi
     if [ "$content" = "start" ]; then
-        STAT_XRAY_EXE=$(stat -L -c "%D:%i" "/proc/$XRAY_PID/exe")
-        STAT_XRAY_BIN=$(stat -L -c "%D:%i" "$MODDIR/bin/xray")
-        if [ $XRAY_PID -gt 0 ] && [ "$STAT_XRAY_EXE" = "$STAT_XRAY_BIN" ]; then
+        if is_proc_running "xray"; then
             echo "Xray is already running with PID $XRAY_PID"
         else
             # Start Xray core
@@ -311,20 +338,18 @@ do_job() {
             echo "$XRAY_PID" > "$PIDFILE"
             echo "Xray is running with PID $XRAY_PID"
 
+            mount_proc_with_name "$XRAY_PID" "xray"
             apply_routing_rules
         fi
     fi
     if [ "$content" = "stop" ]; then
         clear_routing_rules
 
-        if [ $XRAY_PID -gt 0 ]; then
-            STAT_XRAY_EXE=$(stat -L -c "%D:%i" "/proc/$XRAY_PID/exe")
-            STAT_XRAY_BIN=$(stat -L -c "%D:%i" "$MODDIR/bin/xray")
-            if [ "$STAT_XRAY_EXE" = "$STAT_XRAY_BIN" ]; then
-                kill -9 "$XRAY_PID"
-            fi
+        if is_proc_running "xray"; then
+            kill -9 "$XRAY_PID"
             XRAY_PID=0
         fi
+        umount_proc_with_name "xray"
         rm -f "$PIDFILE"
     fi
     if [ "$content" = "start_monitor" ]; then

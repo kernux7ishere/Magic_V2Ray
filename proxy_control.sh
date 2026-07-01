@@ -2,8 +2,7 @@
 MODDIR=${0%/*}
 BINDIR="$MODDIR/bin"
 STUB_DIR=/dev/sysctl_stubs
-PIDFILE="$STUB_DIR/run/xray.pid"
-TUN2SOCKS_PIDFILE="$STUB_DIR/run/tun2socks.pid"
+XRAY_PROC="$STUB_DIR/proc/xray"
 
 PIPE_FILE="$STUB_DIR/run/control.pipe"
 DATADIR="/data/adb/magic_v2ray"
@@ -15,15 +14,13 @@ iptables="/system/bin/iptables"
 ip6tables="/system/bin/ip6tables"
 
 get_status() {
-    if [ -f "$PIDFILE" ]; then
-        PID=$(cat "$PIDFILE")
-        STAT_XRAY_EXE=$(stat -L -c "%D:%i" "/proc/$PID/exe")
-        STAT_XRAY_BIN=$(stat -L -c "%D:%i" "$MODDIR/bin/xray")
-
-        if kill -0 "$PID" 2>/dev/null && [ "$STAT_XRAY_EXE" = "$STAT_XRAY_BIN" ]; then
+    if [ -d "$XRAY_PROC" ]; then
+        if [ -e "$XRAY_PROC/exe" ]; then
             echo "running"
             return 0
         fi
+        # This means the process has crashed or exited unexpectedly
+        # But it has not been unmounted yet, so we can still detect it
         echo "crashed"
         return 2
     fi
@@ -33,7 +30,7 @@ get_status() {
 
 start_proxy() {
     if get_status; then
-        echo "Proxy core is already running with PID $(cat "$PIDFILE")"
+        echo "Proxy core is already running"
         return 0
     fi
 
