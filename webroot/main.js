@@ -54,12 +54,12 @@ function execShell(command, callback) {
         const cbId = `cb_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
         window[cbId] = (errno, stdout, stderr) => {
             delete window[cbId];
-            if (callback) callback(errno === 0 ? stdout.trim() : "");
+            if (callback) callback(stdout.trim(), stderr.trim(), errno);
         };
         ksu.exec(command, "{}", cbId);
     } else {
         showToast("window.ksu not available", "error");
-        if (callback) callback("ERROR");
+        if (callback) callback("ERROR", "", 1);
     }
 }
 
@@ -120,11 +120,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
  
 function updateStatusDisplay() {
-    execShell(`sh ${MODDIR}/proxy_control.sh status`, (status) => {
+    execShell(`sh ${MODDIR}/proxy_control.sh status`, (status, stderr, errno) => {
         const badge = document.getElementById('service-status');
         const s = status || 'stopped';
         badge.innerText = t('status_prefix') + s.toUpperCase();
-        badge.className = `status-badge ${s === 'running' ? 'active' : 'inactive'}`;
+        badge.className = `status-badge ${errno === 0 ? 'active' : 'inactive'}`;
+        if (errno == 2) {
+            showToast(t('toast_xray_core_crash'), "error");
+        }
     });
 }
  

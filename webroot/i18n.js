@@ -188,6 +188,7 @@ const i18n = {
         toast_log_copied: "Log copied to clipboard.",
         toast_log_copy_fail: "Failed to copy log.",
         toast_log_cleared: "Log view cleared.",
+        toast_xray_core_crash: "Xray core crashed. Please check the log for details and report to the developer.",
     },
     vi: {
         tab_dashboard: "Bảng Điều Khiển",
@@ -378,5 +379,6 @@ const i18n = {
         toast_log_copied: "Đã sao chép log.",
         toast_log_copy_fail: "Sao chép log thất bại.",
         toast_log_cleared: "Đã xóa log khỏi màn hình.",
+        toast_xray_core_crash: "Lõi Xray đã bị lỗi. Vui lòng kiểm tra nhật ký để biết chi tiết và báo cáo cho nhà phát triển.",
     }
 };
