@@ -102,12 +102,15 @@ read_table_index() {
 }
 
 get_active_interface() {
+    local iface_index=0
     for iface in /sys/class/net/*; do
         iface=$(basename "$iface")
 
         case "$iface" in
             wlan*|eth*|bt-pan*|rmnet_data*|r_rmnet_data*|ccmni*)
-                if $ip route show table "$iface" | grep -q '^default '; then
+                iface_index="$(read_table_index "$iface")"
+                [ -z "$iface_index" ] && continue
+                if $ip route show table "$iface_index" | grep -q '^default '; then
                     echo "$iface"
                     return 0
                 fi
