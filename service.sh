@@ -330,6 +330,7 @@ do_job() {
     local content="$1"
     if [ "$content" = "wait" ]; then
         : # Do nothing
+        return 0
     fi
     if [ "$content" = "apply_cur_iface" ]; then
         local cur_iface=$(get_active_interface)
@@ -339,6 +340,7 @@ do_job() {
         else
             echo "No active interface detected to apply routing rules."
         fi
+        return 0
     fi
     if [ "$content" = "start" ]; then
         if is_proc_running "xray"; then
@@ -353,6 +355,7 @@ do_job() {
             mount_proc_with_name "$XRAY_PID" "xray"
             apply_routing_rules
         fi
+        return 0
     fi
     if [ "$content" = "stop" ]; then
         clear_routing_rules 2>/dev/null
@@ -363,28 +366,36 @@ do_job() {
         fi
         umount_proc_with_name "xray"
         rm -f "$PIDFILE"
+        return 0
     fi
     if [ "$content" = "start_monitor" ]; then
-        [ $MONITOR_PID -gt 0 ] && kill -9 "$MONITOR_PID"
+        [ $MONITOR_PID -gt 0 ] && is_proc_running "monitor_net_interfaces" && kill -9 "$MONITOR_PID"
         MONITOR_PID=0
         monitor_net_interfaces &
         MONITOR_PID=$!
+        mount_proc_with_name "$MONITOR_PID" "monitor_net_interfaces"
         echo "monitor_net_interfaces is running with PID $MONITOR_PID"
+        return 0
     fi
     if [ "$content" = "stop_monitor" ]; then
-        if [ $MONITOR_PID -gt 0 ]; then
+        if [ $MONITOR_PID -gt 0 ] && is_proc_running "monitor_net_interfaces"; then
             kill -9 "$MONITOR_PID"
             echo "killed monitor_net_interfaces is with PID $MONITOR_PID"
         fi
+        umount_proc_with_name "monitor_net_interfaces"
         MONITOR_PID=0
+        return 0
     fi
+    return 1
 }
 
 {
 while true; do
     if read -r line < "$PIPE_FILE"; then
         if [ -n "$line" ]; then
-            do_job "$line"
+            if ! do_job "$line"; then
+                echo "Unknown command: $line"
+            fi
         fi
     fi
 done
