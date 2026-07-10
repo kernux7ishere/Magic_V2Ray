@@ -689,6 +689,8 @@ function renderProfiles() {
                         <button class="btn-menu-trigger" onclick="toggleNodeMenu(event, this)" style="flex-shrink: 0;">⋮</button>
                         <div class="node-dropdown-menu">
                             <button onclick="${editAction}">${t('menu_edit')}</button>
+                            <button class="btn-ping-category" onclick="checkSingleHttpWithClose(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_check_http')}</button>
+                            <button class="btn-ping-category" onclick="checkSingleIpWithClose(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_check_ip')}</button>
                             <button class="btn-delete-item" onclick="deleteNode(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_delete')}</button>
                         </div>
                     </div>
@@ -1965,6 +1967,91 @@ function _buildXrayTestInbound(node, index) {
     return { testIp, testPort, tmpFile, configB64: utoa(JSON.stringify(xrayConfigObj)) };
 }
 
+async function _execNodeHttpCheck(node, index, pingSpan) {
+    if (pingSpan) {
+        pingSpan.innerText = "...";
+        pingSpan.style.color = "var(--text-muted)";
+    }
+
+    let testIp, testPort, tmpFile, configB64;
+    try {
+        ({ testIp, testPort, tmpFile, configB64 } = _buildXrayTestInbound(node, index));
+    } catch (e) {
+        if (pingSpan) {
+            pingSpan.innerText = "?";
+            pingSpan.style.color = "var(--red, #ff1744)";
+        }
+        return;
+    }
+
+    const cmd = `
+        printf '%s' '${configB64}' | base64 -d > ${tmpFile}
+        ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
+        XPID=$!
+        sleep 1
+        TIME_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s -w "%{time_starttransfer}" --max-time 3 -o /dev/null http://gstatic.com/generate_204 2>/dev/null)
+        kill -9 $XPID >/dev/null 2>&1
+        rm -f ${tmpFile}
+        echo "\${TIME_RES}"
+    `;
+
+    const output = await execShellAsync(cmd);
+    const val = parseFloat(output.trim());
+
+    if (pingSpan) {
+        if (!isNaN(val) && val > 0) {
+            const ms = Math.round(val * 1000);
+            pingSpan.innerText = `${ms}ms`;
+            pingSpan.style.color = "var(--green, #00e676)";
+        } else {
+            pingSpan.innerText = "?";
+            pingSpan.style.color = "var(--red, #ff1744)";
+        }
+    }
+}
+
+async function _execNodeIpCheck(node, index, pingSpan) {
+    if (pingSpan) {
+        pingSpan.innerText = "...";
+        pingSpan.style.color = "var(--text-muted)";
+    }
+
+    let testIp, testPort, tmpFile, configB64;
+    try {
+        ({ testIp, testPort, tmpFile, configB64 } = _buildXrayTestInbound(node, index));
+    } catch (e) {
+        if (pingSpan) {
+            pingSpan.innerText = "?";
+            pingSpan.style.color = "var(--red, #ff1744)";
+        }
+        return;
+    }
+
+    const cmd = `
+        printf '%s' '${configB64}' | base64 -d > ${tmpFile}
+        ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
+        XPID=$!
+        sleep 1
+        IP_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://ifconfig.me 2>/dev/null)
+        kill -9 $XPID >/dev/null 2>&1
+        rm -f ${tmpFile}
+        echo "\${IP_RES}"
+    `;
+
+    const output = await execShellAsync(cmd);
+    const ip = output.trim();
+
+    if (pingSpan) {
+        if (ip) {
+            pingSpan.innerText = ip;
+            pingSpan.style.color = "var(--green, #00e676)";
+        } else {
+            pingSpan.innerText = "?";
+            pingSpan.style.color = "var(--red, #ff1744)";
+        }
+    }
+}
+
 async function pingCategoryCheckHttp(category) {
     const catData = profiles[category];
     if (!catData || !catData.nodes || catData.nodes.length === 0) return;
@@ -1974,46 +2061,7 @@ async function pingCategoryCheckHttp(category) {
 
     await parallelWithLimit(nodesToTest, CONCURRENCY_LIMIT, async ({ node, index }) => {
         const pingSpan = document.getElementById(`ping-${category}-${node.id}`);
-        if (pingSpan) {
-            pingSpan.innerText = "...";
-            pingSpan.style.color = "var(--text-muted)";
-        }
-
-        let testIp, testPort, tmpFile, configB64;
-        try {
-            ({ testIp, testPort, tmpFile, configB64 } = _buildXrayTestInbound(node, index));
-        } catch (e) {
-            if (pingSpan) {
-                pingSpan.innerText = "?";
-                pingSpan.style.color = "var(--red, #ff1744)";
-            }
-            return;
-        }
-
-        const cmd = `
-            printf '%s' '${configB64}' | base64 -d > ${tmpFile}
-            ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
-            XPID=$!
-            sleep 1
-            TIME_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s -w "%{time_starttransfer}" --max-time 3 -o /dev/null http://gstatic.com/generate_204 2>/dev/null)
-            kill -9 $XPID >/dev/null 2>&1
-            rm -f ${tmpFile}
-            echo "\${TIME_RES}"
-        `;
-
-        const output = await execShellAsync(cmd);
-        const val = parseFloat(output.trim());
-
-        if (pingSpan) {
-            if (!isNaN(val) && val > 0) {
-                const ms = Math.round(val * 1000);
-                pingSpan.innerText = `${ms}ms`;
-                pingSpan.style.color = "var(--green, #00e676)";
-            } else {
-                pingSpan.innerText = "?";
-                pingSpan.style.color = "var(--red, #ff1744)";
-            }
-        }
+        await _execNodeHttpCheck(node, index, pingSpan);
     });
 }
 
@@ -2026,46 +2074,30 @@ async function pingCategoryCheckIp(category) {
 
     await parallelWithLimit(nodesToTest, CONCURRENCY_LIMIT, async ({ node, index }) => {
         const pingSpan = document.getElementById(`ping-${category}-${node.id}`);
-        if (pingSpan) {
-            pingSpan.innerText = "...";
-            pingSpan.style.color = "var(--text-muted)";
-        }
-
-        let testIp, testPort, tmpFile, configB64;
-        try {
-            ({ testIp, testPort, tmpFile, configB64 } = _buildXrayTestInbound(node, index));
-        } catch (e) {
-            if (pingSpan) {
-                pingSpan.innerText = "?";
-                pingSpan.style.color = "var(--red, #ff1744)";
-            }
-            return;
-        }
-
-        const cmd = `
-            printf '%s' '${configB64}' | base64 -d > ${tmpFile}
-            ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
-            XPID=$!
-            sleep 1
-            IP_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://ifconfig.me 2>/dev/null)
-            kill -9 $XPID >/dev/null 2>&1
-            rm -f ${tmpFile}
-            echo "\${IP_RES}"
-        `;
-
-        const output = await execShellAsync(cmd);
-        const ip = output.trim();
-
-        if (pingSpan) {
-            if (ip) {
-                pingSpan.innerText = ip;
-                pingSpan.style.color = "var(--green, #00e676)";
-            } else {
-                pingSpan.innerText = "?";
-                pingSpan.style.color = "var(--red, #ff1744)";
-            }
-        }
+        await _execNodeIpCheck(node, index, pingSpan);
     });
+}
+
+// --- Single-node (per-config) HTTP / IP checks ---
+
+async function checkSingleNodeHttp(category, nodeId) {
+    const catData = profiles[category];
+    if (!catData || !catData.nodes) return;
+    const index = catData.nodes.findIndex(n => n.id === nodeId);
+    if (index === -1) return;
+    const node = catData.nodes[index];
+    const pingSpan = document.getElementById(`ping-${category}-${node.id}`);
+    await _execNodeHttpCheck(node, index, pingSpan);
+}
+
+async function checkSingleNodeIp(category, nodeId) {
+    const catData = profiles[category];
+    if (!catData || !catData.nodes) return;
+    const index = catData.nodes.findIndex(n => n.id === nodeId);
+    if (index === -1) return;
+    const node = catData.nodes[index];
+    const pingSpan = document.getElementById(`ping-${category}-${node.id}`);
+    await _execNodeIpCheck(node, index, pingSpan);
 }
 
 async function checkHttpWithClose(event, category) {
@@ -2090,6 +2122,38 @@ async function checkIpWithClose(event, category) {
     await new Promise(r => setTimeout(r, 150));
     try {
         await pingCategoryCheckIp(category);
+    } finally {
+        btn.disabled = false;
+        hideLoading();
+    }
+}
+
+async function checkSingleHttpWithClose(event, category, nodeId) {
+    const catData = profiles[category];
+    const node = catData?.nodes?.find(n => n.id === nodeId);
+    showLoading(`${t("toast_check_http")}${node ? node.name : ''}...`);
+    const btn = event.currentTarget;
+    closeAllMenus();
+    btn.disabled = true;
+    await new Promise(r => setTimeout(r, 150));
+    try {
+        await checkSingleNodeHttp(category, nodeId);
+    } finally {
+        btn.disabled = false;
+        hideLoading();
+    }
+}
+
+async function checkSingleIpWithClose(event, category, nodeId) {
+    const catData = profiles[category];
+    const node = catData?.nodes?.find(n => n.id === nodeId);
+    showLoading(`${t("toast_check_ip")}${node ? node.name : ''}...`);
+    const btn = event.currentTarget;
+    closeAllMenus();
+    btn.disabled = true;
+    await new Promise(r => setTimeout(r, 150));
+    try {
+        await checkSingleNodeIp(category, nodeId);
     } finally {
         btn.disabled = false;
         hideLoading();
