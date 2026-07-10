@@ -407,49 +407,137 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                 }
             };
 
-            // SIP003 plugin support (e.g. plugin=v2ray-plugin;tls;host=...;path=...)
-            // Xray-core doesn't spawn the plugin binary; instead the plugin's
-            // underlying transport (websocket, optionally over TLS) is expressed
-            // natively via streamSettings, which is functionally equivalent.
             if (ssQueryStr) {
                 const ssParams = new URLSearchParams(ssQueryStr);
-                const pluginStr = ssParams.get('plugin');
-                if (pluginStr) {
-                    const pluginParts = pluginStr.split(';');
-                    const pluginName = pluginParts[0];
-                    if (pluginName === 'v2ray-plugin') {
-                        const pOpts = {};
-                        for (let i = 1; i < pluginParts.length; i++) {
-                            const seg = pluginParts[i];
-                            if (!seg) continue;
-                            const eqIdx = seg.indexOf('=');
-                            if (eqIdx === -1) {
-                                pOpts[seg] = true;
-                            } else {
-                                pOpts[seg.substring(0, eqIdx)] = seg.substring(eqIdx + 1);
-                            }
-                        }
-                        const pluginNet = pOpts.mode === 'quic' ? 'quic' : 'ws';
-                        outbound.streamSettings.network = pluginNet;
-                        if (pOpts.tls) {
-                            outbound.streamSettings.security = 'tls';
+                const netType = ssParams.get('type');
+
+                if (netType) {
+                    // Extended format (this project's own convention, same shape as
+                    // vless/trojan): ?type=...&security=...&... — supports the full
+                    // range of Xray transports (tcp/kcp/ws/httpupgrade/xhttp/h2/grpc)
+                    // and security layers (tls/reality) for Shadowsocks outbounds.
+                    const net = netType || 'tcp';
+                    const sec = ssParams.get('security') || 'none';
+                    outbound.streamSettings.network = net;
+                    outbound.streamSettings.security = sec;
+
+                    if (sec === 'tls' || sec === 'reality') {
+                        if (sec === 'reality') {
+                            outbound.streamSettings.realitySettings = {
+                                serverName: ssParams.get('sni') || "",
+                                fingerprint: ssParams.get('fp') || "chrome",
+                                publicKey: ssParams.get('pbk') || "",
+                                shortId: ssParams.get('sid') || "",
+                                spiderX: ssParams.get('spx') || ""
+                            };
+                        } else {
                             outbound.streamSettings.tlsSettings = {
-                                serverName: pOpts.host || ssHost,
-                                ...(pOpts.allowinsecure ? { allowInsecure: true } : {})
+                                serverName: ssParams.get('sni') || "",
+                                alpn: ssParams.get('alpn') ? ssParams.get('alpn').split(',') : undefined,
+                                fingerprint: ssParams.get('fp') || undefined
                             };
                             if (settings.pinnedPeerCertSha256) {
                                 outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [settings.pinnedPeerCertSha256];
                             }
                         }
-                        if (pluginNet === 'ws') {
-                            outbound.streamSettings.wsSettings = {
-                                path: pOpts.path || '/',
-                                headers: pOpts.host ? { Host: pOpts.host } : {}
-                            };
-                        } else if (pluginNet === 'quic') {
-                            outbound.streamSettings.quicSettings = {
-                                header: { type: 'none' }
-                            };
+                    }
+
+                    if (net === 'tcp') {
+                        const headerType = ssParams.get('headerType') || 'none';
+                        if (headerType && headerType !== 'none') {
+                            const tcpHeader = { type: headerType };
+                            if (headerType === 'http') {
+                                const httpPath = ssParams.get('path') || '/';
+                                const httpHost = ssParams.get('host') || '';
+                                tcpHeader.request = {
+                                    path: httpPath.split(','),
+                                    headers: httpHost ? { Host: httpHost.split(',') } : {}
+                                };
+                            }
+                            outbound.streamSettings.tcpSettings = { header: tcpHeader };
+                        }
+                    } else if (net === 'kcp' || net === 'mkcp') {
+                        outbound.streamSettings.kcpSettings = {
+                            header: { type: ssParams.get('headerType') || 'none' },
+                            ...(ssParams.get('seed') ? { seed: ssParams.get('seed') } : {})
+                        };
+                    } else if (net === 'ws') {
+                        outbound.streamSettings.wsSettings = {
+                            path: ssParams.get('path') || "/",
+                            host: ssParams.get('host') || ""
+                        };
+                    } else if (net === 'httpupgrade') {
+                        outbound.streamSettings.httpupgradeSettings = {
+                            path: ssParams.get('path') || "/",
+                            host: ssParams.get('host') || ""
+                        };
+                    } else if (net === 'xhttp' || net === 'splithttp') {
+                        const xhttpSettings = {
+                            path: ssParams.get('path') || "/",
+                            host: ssParams.get('host') || ""
+                        };
+                        const mode = ssParams.get('mode');
+                        if (mode && mode !== 'auto') xhttpSettings.mode = mode;
+                        const extra = ssParams.get('extra');
+                        if (extra) { try { Object.assign(xhttpSettings, JSON.parse(extra)); } catch(e) {} }
+                        outbound.streamSettings.xhttpSettings = xhttpSettings;
+                    } else if (net === 'h2' || net === 'http') {
+                        outbound.streamSettings.httpSettings = {
+                            path: ssParams.get('path') || "/",
+                            host: ssParams.get('host') ? ssParams.get('host').split(',').map(h => h.trim()) : []
+                        };
+                    } else if (net === 'grpc') {
+                        outbound.streamSettings.grpcSettings = {
+                            serviceName: ssParams.get('serviceName') || ssParams.get('path') || "",
+                            multiMode: ssParams.get('mode') === 'multi',
+                            ...(ssParams.get('authority') ? { authority: ssParams.get('authority') } : {})
+                        };
+                    }
+                } else {
+                    // Legacy SIP003 plugin= convention (e.g.
+                    // plugin=v2ray-plugin;tls;host=...;path=...), still understood
+                    // for backward compatibility with subscriptions from other
+                    // panels. Xray-core doesn't spawn the plugin binary; instead the
+                    // plugin's underlying transport (websocket, optionally over
+                    // TLS) is expressed natively via streamSettings.
+                    const pluginStr = ssParams.get('plugin');
+                    if (pluginStr) {
+                        const pluginParts = pluginStr.split(';');
+                        const pluginName = pluginParts[0];
+                        if (pluginName === 'v2ray-plugin') {
+                            const pOpts = {};
+                            for (let i = 1; i < pluginParts.length; i++) {
+                                const seg = pluginParts[i];
+                                if (!seg) continue;
+                                const eqIdx = seg.indexOf('=');
+                                if (eqIdx === -1) {
+                                    pOpts[seg] = true;
+                                } else {
+                                    pOpts[seg.substring(0, eqIdx)] = seg.substring(eqIdx + 1);
+                                }
+                            }
+                            const pluginNet = pOpts.mode === 'quic' ? 'quic' : 'ws';
+                            outbound.streamSettings.network = pluginNet;
+                            if (pOpts.tls) {
+                                outbound.streamSettings.security = 'tls';
+                                outbound.streamSettings.tlsSettings = {
+                                    serverName: pOpts.host || ssHost,
+                                    ...(pOpts.allowinsecure ? { allowInsecure: true } : {})
+                                };
+                                if (settings.pinnedPeerCertSha256) {
+                                    outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [settings.pinnedPeerCertSha256];
+                                }
+                            }
+                            if (pluginNet === 'ws') {
+                                outbound.streamSettings.wsSettings = {
+                                    path: pOpts.path || '/',
+                                    headers: pOpts.host ? { Host: pOpts.host } : {}
+                                };
+                            } else if (pluginNet === 'quic') {
+                                outbound.streamSettings.quicSettings = {
+                                    header: { type: 'none' }
+                                };
+                            }
                         }
                     }
                 }
@@ -929,22 +1017,82 @@ function convert_outbound_to_uri(outbound) {
             const userInfo = btoa(`${srv.method}:${srv.password}`);
             const nodeTag = 'SS Node';
 
-            // Reconstruct SIP003 plugin= param if streamSettings carries a
-            // ws/quic transport (translated from v2ray-plugin on parse).
-            let pluginQuery = '';
-            if (net === 'ws' || net === 'quic') {
-                const pluginParts = ['v2ray-plugin'];
+            // quic is legacy-only (never produced by the edit UI); keep routing it
+            // through the old SIP003 plugin= form since Xray's own quic outbound
+            // transport is effectively deprecated.
+            if (net === 'quic') {
+                const pluginParts = ['v2ray-plugin', 'mode=quic'];
                 if (sec === 'tls') pluginParts.push('tls');
-                if (net === 'quic') pluginParts.push('mode=quic');
-                const wsS = ss.wsSettings || {};
                 const tlsS = ss.tlsSettings || {};
-                const host = tlsS.serverName || wsS.headers?.Host || wsS.host || '';
-                if (host) pluginParts.push(`host=${host}`);
-                pluginParts.push(`path=${wsS.path || '/'}`);
-                pluginQuery = `?plugin=${pct(pluginParts.join(';'))}`;
+                if (tlsS.serverName) pluginParts.push(`host=${tlsS.serverName}`);
+                const pluginQuery = `?plugin=${pct(pluginParts.join(';'))}`;
+                return `ss://${userInfo}@${srv.address}:${srv.port}${pluginQuery}#${pct(nodeTag)}`;
             }
 
-            return `ss://${userInfo}@${srv.address}:${srv.port}${pluginQuery}#${pct(nodeTag)}`;
+            // Every other transport (tcp/kcp/ws/httpupgrade/xhttp/h2/grpc) plus
+            // tls/reality security is expressed the same way as vless/trojan —
+            // this project's own parser understands these params natively, and
+            // it covers cases (grpc, h2, httpupgrade, xhttp, tcp+http header,
+            // mKCP obfuscation) that the old SIP003 plugin= convention never could.
+            const q = {};
+            q.type = net;
+            q.security = sec;
+
+            if (sec === 'tls') {
+                const tls = ss.tlsSettings || {};
+                if (tls.serverName)  q.sni = tls.serverName;
+                if (tls.fingerprint) q.fp  = tls.fingerprint;
+                if (tls.alpn?.length) q.alpn = tls.alpn.join(',');
+            } else if (sec === 'reality') {
+                const r = ss.realitySettings || {};
+                if (r.serverName)  q.sni = r.serverName;
+                if (r.fingerprint) q.fp  = r.fingerprint;
+                if (r.publicKey)   q.pbk = r.publicKey;
+                if (r.shortId)     q.sid = r.shortId;
+                if (r.spiderX)     q.spx = r.spiderX;
+            }
+
+            if (net === 'ws') {
+                const ws = ss.wsSettings || {};
+                q.path = ws.path || '/';
+                q.host = ws.headers?.Host || ws.host || '';
+            } else if (net === 'httpupgrade') {
+                const hu = ss.httpupgradeSettings || {};
+                q.path = hu.path || '/';
+                q.host = hu.host || '';
+            } else if (net === 'xhttp' || net === 'splithttp') {
+                const xs = ss.xhttpSettings || {};
+                q.path = xs.path || '/';
+                q.host = xs.host || '';
+                if (xs.mode && xs.mode !== 'auto') q.mode = xs.mode;
+            } else if (net === 'h2' || net === 'http') {
+                const hs = ss.httpSettings || {};
+                q.path = hs.path || '/';
+                q.host = Array.isArray(hs.host) ? hs.host.join(',') : (hs.host || '');
+            } else if (net === 'grpc') {
+                const gs = ss.grpcSettings || {};
+                q.serviceName = gs.serviceName || '';
+                if (gs.multiMode) q.mode = 'multi';
+                if (gs.authority) q.authority = gs.authority;
+            } else if (net === 'kcp' || net === 'mkcp') {
+                const ks = ss.kcpSettings || {};
+                q.headerType = (ks.header || {}).type || 'none';
+                if (ks.seed) q.seed = ks.seed;
+            } else if (net === 'tcp') {
+                const tcpH = (ss.tcpSettings || {}).header || {};
+                if (tcpH.type && tcpH.type !== 'none') {
+                    q.headerType = tcpH.type;
+                    if (tcpH.type === 'http') {
+                        q.path = (tcpH.request?.path || []).join(',') || '/';
+                        const hHost = tcpH.request?.headers?.Host;
+                        q.host = Array.isArray(hHost) ? hHost.join(',') : (hHost || '');
+                    }
+                }
+            }
+
+            const queryStr = buildQuery(q);
+            const suffix = queryStr ? `?${queryStr}` : '';
+            return `ss://${userInfo}@${srv.address}:${srv.port}${suffix}#${pct(nodeTag)}`;
         }
 
         if (proto === 'wireguard') {

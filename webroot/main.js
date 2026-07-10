@@ -805,13 +805,7 @@ function getFullNodeDetails(node) {
         proxyUsername: "",
         proxyPassword: "",
         // Shadowsocks method
-        ssMethod: "aes-256-gcm",
-        // Shadowsocks plugin (SIP003, e.g. v2ray-plugin)
-        ssPlugin: "none",
-        ssPluginMode: "websocket",
-        ssPluginTls: false,
-        ssPluginHost: "",
-        ssPluginPath: "/"
+        ssMethod: "aes-256-gcm"
     };
 
     if (protocol === 'vmess') {
@@ -942,30 +936,79 @@ function getFullNodeDetails(node) {
         if (!d.ssMethod) d.ssMethod = node.security || "aes-256-gcm";
         d.uuid = node.uuid || ""; // password
 
-        // Parse SIP003 plugin (e.g. plugin=v2ray-plugin;tls;host=...;path=...)
+        // Transport/security: either the extended type=/security= query params
+        // (this project's own format, same shape as vless/trojan), or a legacy
+        // SIP003 plugin= param translated into the equivalent network/security
+        // fields so it renders correctly in the standard Transport/Security UI.
         try {
             const qIdx = uri.indexOf('?');
             if (qIdx !== -1) {
                 const hashIdx = uri.indexOf('#');
                 const qEnd = (hashIdx !== -1 && hashIdx > qIdx) ? hashIdx : uri.length;
-                const qp = new URLSearchParams(uri.substring(qIdx + 1, qEnd));
-                const pluginStr = qp.get('plugin');
-                if (pluginStr) {
-                    const parts = pluginStr.split(';');
-                    if (parts[0] === 'v2ray-plugin') {
-                        d.ssPlugin = 'v2ray-plugin';
-                        const opts = {};
-                        for (let i = 1; i < parts.length; i++) {
-                            const seg = parts[i];
-                            if (!seg) continue;
-                            const eq = seg.indexOf('=');
-                            if (eq === -1) opts[seg] = true;
-                            else opts[seg.substring(0, eq)] = seg.substring(eq + 1);
+                const p = new URLSearchParams(uri.substring(qIdx + 1, qEnd));
+
+                if (p.get('type')) {
+                    d.network = p.get('type') || 'tcp';
+                    d.security = p.get('security') || 'none';
+                    d.sni = p.get('sni') || '';
+                    d.alpn = p.get('alpn') || '';
+                    d.fingerprint = p.get('fp') || 'chrome';
+
+                    if (d.network === 'tcp') {
+                        d.tcpHeaderType = p.get('headerType') || 'none';
+                        if (d.tcpHeaderType === 'http') {
+                            d.tcpHttpHost = p.get('host') || '';
+                            d.tcpHttpPath = p.get('path') || '/';
                         }
-                        d.ssPluginTls = !!opts.tls;
-                        d.ssPluginHost = opts.host || '';
-                        d.ssPluginPath = opts.path || '/';
-                        d.ssPluginMode = opts.mode === 'quic' ? 'quic' : 'websocket';
+                    } else if (d.network === 'kcp' || d.network === 'mkcp') {
+                        d.kcpHeader = p.get('headerType') || 'none';
+                        d.kcpHost = p.get('host') || '';
+                        d.kcpSeed = p.get('seed') || '';
+                    } else if (d.network === 'ws') {
+                        d.wsPath = p.get('path') || '/';
+                        d.wsHost = p.get('host') || '';
+                    } else if (d.network === 'httpupgrade') {
+                        d.httpupgradeHost = p.get('host') || '';
+                        d.httpupgradePath = p.get('path') || '/';
+                    } else if (d.network === 'xhttp' || d.network === 'splithttp') {
+                        d.xhttpMode = p.get('mode') || 'auto';
+                        d.xhttpHost = p.get('host') || '';
+                        d.xhttpPath = p.get('path') || '/';
+                        try { d.xhttpExtra = p.get('extra') ? JSON.stringify(JSON.parse(p.get('extra'))) : ''; } catch(e) { d.xhttpExtra = p.get('extra') || ''; }
+                    } else if (d.network === 'h2' || d.network === 'http') {
+                        d.h2Host = p.get('host') || '';
+                        d.h2Path = p.get('path') || '/';
+                    } else if (d.network === 'grpc') {
+                        d.grpcServiceName = p.get('serviceName') || p.get('path') || '';
+                        d.grpcMode = p.get('mode') || 'gun';
+                        d.grpcAuth = p.get('authority') || '';
+                    }
+
+                    if (d.security === 'reality') {
+                        d.publicKey = p.get('pbk') || '';
+                        d.shortId = p.get('sid') || '';
+                    }
+                } else {
+                    const pluginStr = p.get('plugin');
+                    if (pluginStr) {
+                        const parts = pluginStr.split(';');
+                        if (parts[0] === 'v2ray-plugin') {
+                            const opts = {};
+                            for (let i = 1; i < parts.length; i++) {
+                                const seg = parts[i];
+                                if (!seg) continue;
+                                const eq = seg.indexOf('=');
+                                if (eq === -1) opts[seg] = true;
+                                else opts[seg.substring(0, eq)] = seg.substring(eq + 1);
+                            }
+                            // quic legacy mode isn't editable in the UI; still land
+                            // on ws so the node opens with sane defaults.
+                            d.network = 'ws';
+                            d.security = opts.tls ? 'tls' : 'none';
+                            d.wsHost = opts.host || '';
+                            d.wsPath = opts.path || '/';
+                            if (opts.tls) d.sni = opts.host || '';
+                        }
                     }
                 }
             }
@@ -1031,14 +1074,53 @@ function serializeNodeDetailsToUri(d, protocol) {
         const password = d.uuid || "";
         const userPart = btoa(`${method}:${password}`);
         let urlStr = `ss://${userPart}@${d.address}:${d.port}`;
-        if (d.ssPlugin === 'v2ray-plugin') {
-            const parts = ['v2ray-plugin'];
-            if (d.ssPluginTls) parts.push('tls');
-            if (d.ssPluginMode === 'quic') parts.push('mode=quic');
-            if (d.ssPluginHost) parts.push(`host=${d.ssPluginHost}`);
-            parts.push(`path=${d.ssPluginPath || '/'}`);
-            urlStr += `?plugin=${encodeURIComponent(parts.join(';'))}`;
+
+        // Same transport/security query params as vless/trojan — covers
+        // tcp/kcp/ws/httpupgrade/xhttp/h2/grpc plus tls/reality.
+        let params = new URLSearchParams();
+        params.set('type', d.network || 'tcp');
+        params.set('security', d.security || 'none');
+        if (d.security === 'tls' || d.security === 'reality') {
+            if (d.sni) params.set('sni', d.sni);
+            if (d.alpn) params.set('alpn', d.alpn);
+            if (d.fingerprint) params.set('fp', d.fingerprint);
         }
+        if (d.network === 'tcp' && d.tcpHeaderType && d.tcpHeaderType !== 'none') {
+            params.set('headerType', d.tcpHeaderType);
+            if (d.tcpHeaderType === 'http') {
+                if (d.tcpHttpHost) params.set('host', d.tcpHttpHost);
+                if (d.tcpHttpPath) params.set('path', d.tcpHttpPath);
+            }
+        } else if (d.network === 'kcp' || d.network === 'mkcp') {
+            if (d.kcpHeader && d.kcpHeader !== 'none') params.set('headerType', d.kcpHeader);
+            if (d.kcpHost) params.set('host', d.kcpHost);
+            if (d.kcpSeed) params.set('seed', d.kcpSeed);
+        } else if (d.network === 'ws') {
+            if (d.wsPath) params.set('path', d.wsPath);
+            if (d.wsHost) params.set('host', d.wsHost);
+        } else if (d.network === 'httpupgrade') {
+            if (d.httpupgradeHost) params.set('host', d.httpupgradeHost);
+            if (d.httpupgradePath) params.set('path', d.httpupgradePath);
+        } else if (d.network === 'xhttp' || d.network === 'splithttp') {
+            if (d.xhttpMode && d.xhttpMode !== 'auto') params.set('mode', d.xhttpMode);
+            if (d.xhttpHost) params.set('host', d.xhttpHost);
+            if (d.xhttpPath) params.set('path', d.xhttpPath);
+            if (d.xhttpExtra) { try { params.set('extra', d.xhttpExtra); } catch(e) {} }
+        } else if (d.network === 'h2' || d.network === 'http') {
+            if (d.h2Host) params.set('host', d.h2Host);
+            if (d.h2Path) params.set('path', d.h2Path);
+        } else if (d.network === 'grpc') {
+            if (d.grpcServiceName) params.set('serviceName', d.grpcServiceName);
+            if (d.grpcMode && d.grpcMode !== 'gun') params.set('mode', d.grpcMode);
+            if (d.grpcAuth) params.set('authority', d.grpcAuth);
+        }
+        if (d.security === 'reality') {
+            if (d.publicKey) params.set('pbk', d.publicKey);
+            if (d.shortId) params.set('sid', d.shortId);
+        }
+        let pStr = params.toString();
+        if (pStr) urlStr += "?" + pStr;
+
         if (d.name) urlStr += "#" + encodeURIComponent(d.name);
         return urlStr;
     }
@@ -1232,9 +1314,7 @@ function _populateEditModal(node, isNew = false) {
         headerType: "none", wgSecretKey: "", wgPublicKey: "", wgPresharedKey: "",
         wgReserved: "", wgLocalAddress: "172.16.0.2/32", hy2ObfsPassword: "",
         hy2PortHopping: "", hy2HopInterval: "", hy2BandwidthDown: "", hy2BandwidthUp: "",
-        hy2Sni: "", proxyUsername: "", proxyPassword: "", ssMethod: "aes-256-gcm",
-        ssPlugin: "none", ssPluginMode: "websocket", ssPluginTls: false,
-        ssPluginHost: "", ssPluginPath: "/"
+        hy2Sni: "", proxyUsername: "", proxyPassword: "", ssMethod: "aes-256-gcm"
     } : getFullNodeDetails(node);
 
     const proto = node.protocol;
@@ -1305,30 +1385,18 @@ function _populateEditModal(node, isNew = false) {
         const ssVal = d.ssMethod || 'aes-256-gcm';
         ssMethodSel.value = [...ssMethodSel.options].some(o => o.value === ssVal) ? ssVal : 'aes-256-gcm';
     }
-    // SS plugin (SIP003, e.g. v2ray-plugin)
-    const ssPluginSel = document.getElementById('edit-ss-plugin');
-    if (ssPluginSel) {
-        const pluginVal = d.ssPlugin || 'none';
-        ssPluginSel.value = [...ssPluginSel.options].some(o => o.value === pluginVal) ? pluginVal : 'none';
-    }
-    document.getElementById('edit-ss-plugin-mode').value = d.ssPluginMode || 'websocket';
-    document.getElementById('edit-ss-plugin-tls').checked = !!d.ssPluginTls;
-    document.getElementById('edit-ss-plugin-host').value = d.ssPluginHost || '';
-    document.getElementById('edit-ss-plugin-path').value = d.ssPluginPath || '/';
-
     // Show/hide standard protocol fields
     const isSimpleProxy = (proto === 'socks' || proto === 'http');
     const isWireGuard = (proto === 'wireguard');
     const isHysteria2 = (proto === 'hysteria2');
     const isShadowsocks = (proto === 'shadowsocks');
-    const isClassic = (proto === 'vmess' || proto === 'vless' || proto === 'trojan');
+    const isClassic = (proto === 'vmess' || proto === 'vless' || proto === 'trojan' || proto === 'shadowsocks');
 
     document.getElementById('field-group-uuid').style.display = (proto === 'wireguard') ? 'none' : 'flex';
     document.getElementById('field-group-encryption').style.display = (proto === 'vmess') ? 'flex' : 'none';
     document.getElementById('field-group-flow').style.display = (proto === 'vless') ? 'flex' : 'none';
     document.getElementById('field-group-alterid').style.display = (proto === 'vmess') ? 'flex' : 'none';
     document.getElementById('field-group-ss-method').style.display = isShadowsocks ? 'flex' : 'none';
-    document.getElementById('field-group-ss-plugin').style.display = isShadowsocks ? 'flex' : 'none';
 
     // Transport section: only for vmess/vless/trojan
     document.getElementById('section-transport-wrapper').style.display = isClassic ? 'block' : 'none';
@@ -1393,11 +1461,6 @@ function updateEditFormVisibility() {
         document.getElementById('field-group-flow').style.display = (sec === 'tls' || sec === 'reality') ? 'flex' : 'none';
     }
 
-    // Shadowsocks plugin (SIP003) subfields
-    const ssPluginSel = document.getElementById('edit-ss-plugin');
-    if (ssPluginSel) {
-        document.getElementById('subfields-ss-plugin').style.display = (ssPluginSel.value !== 'none') ? 'flex' : 'none';
-    }
 }
 
 function closeEditNodeModal() {
@@ -1469,13 +1532,7 @@ function _collectEditFormData() {
         proxyUsername: document.getElementById('edit-proxy-username').value.trim(),
         proxyPassword: document.getElementById('edit-proxy-password').value.trim(),
         // Shadowsocks
-        ssMethod: document.getElementById('edit-ss-method').value,
-        // Shadowsocks plugin (SIP003, e.g. v2ray-plugin)
-        ssPlugin: document.getElementById('edit-ss-plugin').value,
-        ssPluginMode: document.getElementById('edit-ss-plugin-mode').value,
-        ssPluginTls: document.getElementById('edit-ss-plugin-tls').checked,
-        ssPluginHost: document.getElementById('edit-ss-plugin-host').value.trim(),
-        ssPluginPath: document.getElementById('edit-ss-plugin-path').value.trim() || "/"
+        ssMethod: document.getElementById('edit-ss-method').value
     };
 }
 

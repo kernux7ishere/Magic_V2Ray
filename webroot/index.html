@@ -320,39 +320,6 @@
                     </select>
                 </div>
 
-                <!-- Shadowsocks plugin (SIP003, e.g. v2ray-plugin) -->
-                <div class="edit-item-field" id="field-group-ss-plugin" style="display:none;">
-                    <label data-i18n="lbl_ss_plugin">Plugin</label>
-                    <select id="edit-ss-plugin" onchange="updateEditFormVisibility()">
-                        <option value="none">none</option>
-                        <option value="v2ray-plugin">v2ray-plugin</option>
-                    </select>
-                </div>
-                <div id="subfields-ss-plugin" class="conditional-fields" style="display:none;">
-                    <div class="edit-item-field">
-                        <label data-i18n="lbl_ss_plugin_mode">Plugin Mode</label>
-                        <select id="edit-ss-plugin-mode">
-                            <option value="websocket">websocket</option>
-                            <option value="quic">quic</option>
-                        </select>
-                    </div>
-                    <div class="setting-item-row toggle-row" style="padding: 0;">
-                        <label class="toggle-switch">
-                            <span data-i18n="lbl_ss_plugin_tls">Enable TLS</span>
-                        </label>
-                        <input type="checkbox" id="edit-ss-plugin-tls">
-                        <span class="toggle-slider"></span>
-                    </div>
-                    <div class="edit-item-field">
-                        <label data-i18n="lbl_ss_plugin_host">Plugin Host (SNI)</label>
-                        <input type="text" id="edit-ss-plugin-host" placeholder="example.com">
-                    </div>
-                    <div class="edit-item-field">
-                        <label data-i18n="lbl_ss_plugin_path">Plugin Path</label>
-                        <input type="text" id="edit-ss-plugin-path" placeholder="/">
-                    </div>
-                </div>
-
                 <!-- WireGuard-specific fields -->
                 <div id="subfields-wireguard" class="conditional-fields" style="display:none;">
                     <div class="edit-item-field">
@@ -421,7 +388,7 @@
                     </div>
                 </div>
 
-                <!-- TRANSPORT section (hidden for WG / Hysteria2 / SOCKS / HTTP) -->
+                <!-- TRANSPORT section (vmess/vless/trojan/shadowsocks; hidden for WG / Hysteria2 / SOCKS / HTTP) -->
                 <div id="section-transport-wrapper">
                 <div class="modal-section-divider" data-i18n="categories_title">TRANSPORT</div>
                 <div class="edit-item-field">
@@ -563,7 +530,7 @@
 
                 </div><!-- end section-transport-wrapper -->
 
-                <!-- SECURITY section (hidden for WireGuard / SOCKS / HTTP / Hysteria2) -->
+                <!-- SECURITY section (vmess/vless/trojan/shadowsocks; hidden for WireGuard / SOCKS / HTTP / Hysteria2) -->
                 <div id="section-security-wrapper">
                 <div class="modal-section-divider" data-i18n="lbl_tls">SECURITY</div>
                 <div class="edit-item-field">
