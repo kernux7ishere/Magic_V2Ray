@@ -805,7 +805,13 @@ function getFullNodeDetails(node) {
         proxyUsername: "",
         proxyPassword: "",
         // Shadowsocks method
-        ssMethod: "aes-256-gcm"
+        ssMethod: "aes-256-gcm",
+        // Shadowsocks plugin (SIP003, e.g. v2ray-plugin)
+        ssPlugin: "none",
+        ssPluginMode: "websocket",
+        ssPluginTls: false,
+        ssPluginHost: "",
+        ssPluginPath: "/"
     };
 
     if (protocol === 'vmess') {
@@ -935,6 +941,35 @@ function getFullNodeDetails(node) {
         // Final fallback to stored node.security
         if (!d.ssMethod) d.ssMethod = node.security || "aes-256-gcm";
         d.uuid = node.uuid || ""; // password
+
+        // Parse SIP003 plugin (e.g. plugin=v2ray-plugin;tls;host=...;path=...)
+        try {
+            const qIdx = uri.indexOf('?');
+            if (qIdx !== -1) {
+                const hashIdx = uri.indexOf('#');
+                const qEnd = (hashIdx !== -1 && hashIdx > qIdx) ? hashIdx : uri.length;
+                const qp = new URLSearchParams(uri.substring(qIdx + 1, qEnd));
+                const pluginStr = qp.get('plugin');
+                if (pluginStr) {
+                    const parts = pluginStr.split(';');
+                    if (parts[0] === 'v2ray-plugin') {
+                        d.ssPlugin = 'v2ray-plugin';
+                        const opts = {};
+                        for (let i = 1; i < parts.length; i++) {
+                            const seg = parts[i];
+                            if (!seg) continue;
+                            const eq = seg.indexOf('=');
+                            if (eq === -1) opts[seg] = true;
+                            else opts[seg.substring(0, eq)] = seg.substring(eq + 1);
+                        }
+                        d.ssPluginTls = !!opts.tls;
+                        d.ssPluginHost = opts.host || '';
+                        d.ssPluginPath = opts.path || '/';
+                        d.ssPluginMode = opts.mode === 'quic' ? 'quic' : 'websocket';
+                    }
+                }
+            }
+        } catch(e) {}
     }
 
     // WireGuard
@@ -996,6 +1031,14 @@ function serializeNodeDetailsToUri(d, protocol) {
         const password = d.uuid || "";
         const userPart = btoa(`${method}:${password}`);
         let urlStr = `ss://${userPart}@${d.address}:${d.port}`;
+        if (d.ssPlugin === 'v2ray-plugin') {
+            const parts = ['v2ray-plugin'];
+            if (d.ssPluginTls) parts.push('tls');
+            if (d.ssPluginMode === 'quic') parts.push('mode=quic');
+            if (d.ssPluginHost) parts.push(`host=${d.ssPluginHost}`);
+            parts.push(`path=${d.ssPluginPath || '/'}`);
+            urlStr += `?plugin=${encodeURIComponent(parts.join(';'))}`;
+        }
         if (d.name) urlStr += "#" + encodeURIComponent(d.name);
         return urlStr;
     }
@@ -1189,7 +1232,9 @@ function _populateEditModal(node, isNew = false) {
         headerType: "none", wgSecretKey: "", wgPublicKey: "", wgPresharedKey: "",
         wgReserved: "", wgLocalAddress: "172.16.0.2/32", hy2ObfsPassword: "",
         hy2PortHopping: "", hy2HopInterval: "", hy2BandwidthDown: "", hy2BandwidthUp: "",
-        hy2Sni: "", proxyUsername: "", proxyPassword: "", ssMethod: "aes-256-gcm"
+        hy2Sni: "", proxyUsername: "", proxyPassword: "", ssMethod: "aes-256-gcm",
+        ssPlugin: "none", ssPluginMode: "websocket", ssPluginTls: false,
+        ssPluginHost: "", ssPluginPath: "/"
     } : getFullNodeDetails(node);
 
     const proto = node.protocol;
@@ -1260,6 +1305,16 @@ function _populateEditModal(node, isNew = false) {
         const ssVal = d.ssMethod || 'aes-256-gcm';
         ssMethodSel.value = [...ssMethodSel.options].some(o => o.value === ssVal) ? ssVal : 'aes-256-gcm';
     }
+    // SS plugin (SIP003, e.g. v2ray-plugin)
+    const ssPluginSel = document.getElementById('edit-ss-plugin');
+    if (ssPluginSel) {
+        const pluginVal = d.ssPlugin || 'none';
+        ssPluginSel.value = [...ssPluginSel.options].some(o => o.value === pluginVal) ? pluginVal : 'none';
+    }
+    document.getElementById('edit-ss-plugin-mode').value = d.ssPluginMode || 'websocket';
+    document.getElementById('edit-ss-plugin-tls').checked = !!d.ssPluginTls;
+    document.getElementById('edit-ss-plugin-host').value = d.ssPluginHost || '';
+    document.getElementById('edit-ss-plugin-path').value = d.ssPluginPath || '/';
 
     // Show/hide standard protocol fields
     const isSimpleProxy = (proto === 'socks' || proto === 'http');
@@ -1273,6 +1328,7 @@ function _populateEditModal(node, isNew = false) {
     document.getElementById('field-group-flow').style.display = (proto === 'vless') ? 'flex' : 'none';
     document.getElementById('field-group-alterid').style.display = (proto === 'vmess') ? 'flex' : 'none';
     document.getElementById('field-group-ss-method').style.display = isShadowsocks ? 'flex' : 'none';
+    document.getElementById('field-group-ss-plugin').style.display = isShadowsocks ? 'flex' : 'none';
 
     // Transport section: only for vmess/vless/trojan
     document.getElementById('section-transport-wrapper').style.display = isClassic ? 'block' : 'none';
@@ -1335,6 +1391,12 @@ function updateEditFormVisibility() {
     // Flow: vless only with tls or reality
     if (currentEditingProtocol === 'vless') {
         document.getElementById('field-group-flow').style.display = (sec === 'tls' || sec === 'reality') ? 'flex' : 'none';
+    }
+
+    // Shadowsocks plugin (SIP003) subfields
+    const ssPluginSel = document.getElementById('edit-ss-plugin');
+    if (ssPluginSel) {
+        document.getElementById('subfields-ss-plugin').style.display = (ssPluginSel.value !== 'none') ? 'flex' : 'none';
     }
 }
 
@@ -1407,7 +1469,13 @@ function _collectEditFormData() {
         proxyUsername: document.getElementById('edit-proxy-username').value.trim(),
         proxyPassword: document.getElementById('edit-proxy-password').value.trim(),
         // Shadowsocks
-        ssMethod: document.getElementById('edit-ss-method').value
+        ssMethod: document.getElementById('edit-ss-method').value,
+        // Shadowsocks plugin (SIP003, e.g. v2ray-plugin)
+        ssPlugin: document.getElementById('edit-ss-plugin').value,
+        ssPluginMode: document.getElementById('edit-ss-plugin-mode').value,
+        ssPluginTls: document.getElementById('edit-ss-plugin-tls').checked,
+        ssPluginHost: document.getElementById('edit-ss-plugin-host').value.trim(),
+        ssPluginPath: document.getElementById('edit-ss-plugin-path').value.trim() || "/"
     };
 }
 
