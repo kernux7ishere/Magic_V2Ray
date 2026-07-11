@@ -229,7 +229,7 @@ async function fetchSubscription(category, url, isReload = false) {
     const escapedUrl = url.replace(/'/g, "'\\''");
     const extraArgs = (status === 'running')? "--socks5-hostname 127.17.1.3:808" : "";
     showLoading(`${t("toast_fetch_sub")}${category}...`);
-    execShell(`curl ${extraArgs} -sLk --max-time 15 '${escapedUrl}'`, (res) => {
+    execShell(`${MODDIR}/bin/curl ${extraArgs} -sLk --max-time 15 '${escapedUrl}'`, (res) => {
         if (!res || res.trim() === "") {
             hideLoading();
             return showToast(t('toast_fetch_failed'), "error");
@@ -2114,7 +2114,7 @@ async function _execNodeHttpCheck(node, index, pingSpan) {
         ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
         XPID=$!
         sleep 1
-        TIME_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s -w "%{time_starttransfer}" --max-time 3 -o /dev/null http://gstatic.com/generate_204 2>/dev/null)
+        TIME_RES=$(${MODDIR}/bin/curl --socks5-hostname ${testIp}:${testPort} -s -w "%{time_starttransfer}" --max-time 3 -o /dev/null http://gstatic.com/generate_204 2>/dev/null)
         kill -9 $XPID >/dev/null 2>&1
         rm -f ${tmpFile}
         echo "\${TIME_RES}"
@@ -2157,7 +2157,7 @@ async function _execNodeIpCheck(node, index, pingSpan) {
         ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
         XPID=$!
         sleep 1
-        IP_RES=$(curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://ifconfig.me 2>/dev/null)
+        IP_RES=$(${MODDIR}/bin/curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://ifconfig.me 2>/dev/null)
         kill -9 $XPID >/dev/null 2>&1
         rm -f ${tmpFile}
         echo "\${IP_RES}"
