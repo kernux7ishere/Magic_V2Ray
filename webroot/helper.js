@@ -726,21 +726,21 @@ function convert_uri_to_xray_json(uri, optional_settings) {
             });
         }
 
-        // 2. VPN DNS — only included when FakeIP is NOT active (grayed out in UI when FakeIP is on).
-        if (!useFakeIp && settings.vpnDns && settings.vpnDns.trim()) {
-            dnsServers.push({
-                address: settings.vpnDns.trim(),
-                domains: ["regexp:.+"]
-            });
-        }
-
-        // 3. Domestic DNS — for local/domestic domain resolution, routed direct.
+        // 2. Domestic DNS — for local/domestic domain resolution, routed direct.
         if (settings.domesticDns && settings.domesticDns.trim()) {
             dnsServers.push({
                 address: settings.domesticDns.trim(),
                 domains: ["geosite:cn", "geosite:private"],
                 expectIPs: ["geoip:cn", "geoip:private"],
                 skipFallback: true
+            });
+        }
+
+        // 3. VPN DNS — only included when FakeIP is NOT active (grayed out in UI when FakeIP is on).
+        if (!useFakeIp && settings.vpnDns && settings.vpnDns.trim()) {
+            dnsServers.push({
+                address: settings.vpnDns.trim(),
+                domains: ["regexp:.+"]
             });
         }
 
