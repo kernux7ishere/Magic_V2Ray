@@ -2157,7 +2157,7 @@ async function _execNodeIpCheck(node, index, pingSpan) {
         ${MODDIR}/bin/xray run -c ${tmpFile} >/dev/null 2>&1 &
         XPID=$!
         sleep 1
-        IP_RES=$(${MODDIR}/bin/curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://ifconfig.me 2>/dev/null)
+        IP_RES=$(${MODDIR}/bin/curl --socks5-hostname ${testIp}:${testPort} -s --max-time 3 https://icanhazip.com 2>/dev/null)
         kill -9 $XPID >/dev/null 2>&1
         rm -f ${tmpFile}
         echo "\${IP_RES}"
