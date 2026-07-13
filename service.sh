@@ -102,21 +102,14 @@ read_table_index() {
 }
 
 get_active_interface() {
-    local iface_index=0
-    for iface in /sys/class/net/*; do
-        iface=$(basename "$iface")
-
-        case "$iface" in
-            wlan*|eth*|bt-pan*|rmnet_data*|r_rmnet_data*|ccmni*)
-                iface_index="$(read_table_index "$iface")"
-                [ -z "$iface_index" ] && continue
-                if $ip route show table "$iface_index" | grep -q '^default '; then
-                    echo "$iface"
-                    return 0
-                fi
-                ;;
-        esac
-    done
+    # Ask the kernel the route to 8.8.8.8
+    local iface=$($ip route get 8.8.8.8 2>/dev/null | grep -oE 'dev [^ ]+' | awk '{print $2}')
+    if [ ! -z "$iface" ]; then
+        echo "$iface"
+        return 0
+    fi
+    
+    return 1
 }
 
 remove_mark_rule() {
@@ -142,6 +135,7 @@ apply_mark_rule() {
 
 monitor_net_interfaces() {
     local cur=$(get_active_interface)
+    local new=""
     if [ ! -z "$cur" ]; then
         echo "Initial active interface: $cur"
         # apply iptables rules for the first time
@@ -151,27 +145,13 @@ monitor_net_interfaces() {
     fi
     $ip monitor route | while read -r line; do
         case "$line" in
-            "default "*)
-                cur=""
-                set -- $line
-                while [ $# -gt 0 ]; do
-                    if [ "$1" = "dev" ]; then
-                        cur="$2"
-                        break
-                    fi
-                    shift
-                done
-
-                if [ ! -z "$cur" ]; then
-                    case "$cur" in
-                        wlan*|eth*|bt-pan*|rmnet_data*|r_rmnet_data*|ccmni*)
-                            echo "Network interface switched directly to: $cur"
-                            # Remove the old rule
-                            # then add the new rule
-                            apply_mark_rule "$cur"
-                            ;;
-                    esac
-                fi
+            "default "*|"Deleted default "*|"throw default "*)
+                new=$(get_active_interface)
+                [ -z "$new" ] && continue
+                [ "$new" == "$cur" ] && continue
+                cur="$new"
+                echo "Network interface switched directly to: $cur"
+                apply_mark_rule "$cur"
                 ;;
         esac
     done
