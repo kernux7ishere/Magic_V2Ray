@@ -1311,6 +1311,143 @@ select option:active {
     margin-left: 4px;
 }
 
+/* ===== Network Latency Monitor Tab ===== */
+.latency-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.latency-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.latency-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.latency-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--md-outline);
+    flex-shrink: 0;
+    transition: background .3s;
+}
+.latency-status-dot.live {
+    background: var(--md-success);
+    box-shadow: 0 0 0 3px rgba(109, 213, 140, 0.2);
+    animation: pulse-dot 2s infinite;
+}
+
+.latency-current-value {
+    font-family: var(--md-font-mono);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--md-on-surface);
+    font-variant-numeric: tabular-nums;
+}
+.latency-current-value--timeout {
+    color: var(--md-error);
+}
+
+.latency-enable-label {
+    margin-left: auto;
+}
+
+.latency-stats-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.latency-stat {
+    flex: 1;
+    min-width: 90px;
+    background: var(--md-surface-2);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-md);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.latency-stat-label {
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.latency-stat-value {
+    font-family: var(--md-font-mono);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    font-variant-numeric: tabular-nums;
+}
+
+.latency-chart-wrap {
+    position: relative;
+    height: 200px;
+    background: var(--md-surface-1);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-md);
+    overflow: hidden;
+}
+.latency-chart-wrap svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.latency-empty-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--md-on-surface-variant);
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+    background: var(--md-surface-1);
+}
+
+.latency-legend {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.latency-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+}
+.latency-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.latency-dot--green { background: var(--md-success); }
+.latency-dot--red { background: var(--md-error); }
+
+.latency-target-note {
+    font-size: 12px;
+    color: var(--md-outline);
+    margin: 0;
+}
+
 .spinner {
     width: 40px;
     height: 40px;

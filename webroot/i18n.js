@@ -189,6 +189,20 @@ const i18n = {
         toast_log_copy_fail: "Failed to copy log.",
         toast_log_cleared: "Log view cleared.",
         toast_xray_core_crash: "Xray core crashed. Please check the log for details and report to the developer.",
+
+        // Latency monitor tab
+        tab_latency: "Network Latency",
+        latency_enable_monitor: "Enable monitor",
+        latency_stat_avg: "Avg",
+        latency_stat_min: "Min",
+        latency_stat_max: "Max",
+        latency_stat_loss: "Loss",
+        latency_empty: "Enable monitor to start measuring network latency.",
+        latency_legend_ok: "Response time (ms)",
+        latency_legend_timeout: "Timeout / no connection",
+        latency_timeout_label: "Timeout",
+        toast_latency_started: "Latency monitor started.",
+        toast_latency_stopped: "Latency monitor stopped.",
     },
     vi: {
         tab_dashboard: "Bảng Điều Khiển",
@@ -380,5 +394,19 @@ const i18n = {
         toast_log_copy_fail: "Sao chép log thất bại.",
         toast_log_cleared: "Đã xóa log khỏi màn hình.",
         toast_xray_core_crash: "Lõi Xray đã bị lỗi. Vui lòng kiểm tra nhật ký để biết chi tiết và báo cáo cho nhà phát triển.",
+
+        // Latency monitor tab
+        tab_latency: "Độ Trễ Mạng",
+        latency_enable_monitor: "Bật theo dõi",
+        latency_stat_avg: "TB",
+        latency_stat_min: "Thấp nhất",
+        latency_stat_max: "Cao nhất",
+        latency_stat_loss: "Mất gói",
+        latency_empty: "Bật theo dõi để bắt đầu đo độ trễ mạng.",
+        latency_legend_ok: "Thời gian phản hồi (ms)",
+        latency_legend_timeout: "Timeout / mất kết nối",
+        latency_timeout_label: "Timeout",
+        toast_latency_started: "Đã bật theo dõi độ trễ mạng.",
+        toast_latency_stopped: "Đã tắt theo dõi độ trễ mạng.",
     }
 };

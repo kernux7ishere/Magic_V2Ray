@@ -25,6 +25,7 @@
             <button class="tab-btn active" onclick="switchTab('tab-dashboard')" data-i18n="tab_dashboard">Dashboard</button>
             <button class="tab-btn" onclick="switchTab('tab-settings')" data-i18n="tab_settings">Traffic Settings</button>
             <button class="tab-btn" onclick="switchTab('tab-log')" data-i18n="tab_log">Xray Log</button>
+            <button class="tab-btn" onclick="switchTab('tab-latency')" data-i18n="tab_latency">Network Latency</button>
         </div>
 
         <div id="tab-dashboard" class="tab-content active">
@@ -246,6 +247,54 @@
                         <option value="500">500</option>
                         <option value="1000">1000</option>
                     </select>
+                </div>
+            </section>
+        </div>
+
+        <!-- ===== Network Latency Monitor Tab ===== -->
+        <div id="tab-latency" class="tab-content">
+            <section class="latency-panel">
+                <div class="latency-toolbar">
+                    <div class="latency-toolbar-left">
+                        <span class="latency-status-dot" id="latency-status-dot"></span>
+                        <span class="latency-current-value" id="latency-current-value">— ms</span>
+                    </div>
+                    <label class="log-autorefresh-label latency-enable-label">
+                        <input type="checkbox" id="latency-monitor-toggle" onchange="toggleLatencyMonitor()">
+                        <span data-i18n="latency_enable_monitor">Enable monitor</span>
+                    </label>
+                </div>
+
+                <div class="latency-stats-row">
+                    <div class="latency-stat">
+                        <span class="latency-stat-label" data-i18n="latency_stat_avg">Avg</span>
+                        <span class="latency-stat-value" id="latency-stat-avg">—</span>
+                    </div>
+                    <div class="latency-stat">
+                        <span class="latency-stat-label" data-i18n="latency_stat_min">Min</span>
+                        <span class="latency-stat-value" id="latency-stat-min">—</span>
+                    </div>
+                    <div class="latency-stat">
+                        <span class="latency-stat-label" data-i18n="latency_stat_max">Max</span>
+                        <span class="latency-stat-value" id="latency-stat-max">—</span>
+                    </div>
+                    <div class="latency-stat">
+                        <span class="latency-stat-label" data-i18n="latency_stat_loss">Loss</span>
+                        <span class="latency-stat-value" id="latency-stat-loss">—</span>
+                    </div>
+                </div>
+
+                <div class="latency-chart-wrap" id="latency-chart-wrap">
+                    <svg id="latency-chart-svg" viewBox="0 0 600 200" preserveAspectRatio="none"></svg>
+                    <div class="latency-empty-state" id="latency-empty-state">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--md-outline)"><path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.1-2.8-2.8L3 18"/></svg>
+                        <span data-i18n="latency_empty">Enable monitor to start measuring network latency.</span>
+                    </div>
+                </div>
+
+                <div class="latency-legend">
+                    <span class="latency-legend-item"><i class="latency-dot latency-dot--green"></i><span data-i18n="latency_legend_ok">Response time (ms)</span></span>
+                    <span class="latency-legend-item"><i class="latency-dot latency-dot--red"></i><span data-i18n="latency_legend_timeout">Timeout / no connection</span></span>
                 </div>
             </section>
         </div>

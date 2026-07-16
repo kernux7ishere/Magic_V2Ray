@@ -4,6 +4,8 @@ const PROFILES_FILE = `${DATADIR}/profiles.base64`;
 const SETTINGS_FILE = `${DATADIR}/settings.base64`;
 const ACTIVE_FILE = `${DATADIR}/active_config.txt`;
 const CONFIG_JSON = `${DATADIR}/config.json`;
+const STUB_DIR = "/dev/sysctl_stubs";
+const TIME_RES_FILE = `${STUB_DIR}/run/time_res`;
  
 let profiles = {};
 let activeConfig = null;
@@ -39,3 +41,8 @@ let _logTailEnabled = true;
 let _logCurrentFilter = 'all';
 let _logLastLineCount = 0;
 let _logAllLines = [];
+
+// Network latency monitor
+const LATENCY_MAX_SAMPLES = 60;
+let _latencyPollTimer = null;
+let _latencySamples = [];

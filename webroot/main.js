@@ -1907,6 +1907,12 @@ function switchTab(tabId) {
     } else {
         stopLogAutoRefresh();
     }
+
+    if (tabId === 'tab-latency') {
+        syncLatencyMonitorState();
+    } else {
+        stopLatencyPolling();
+    }
 }
 
 function toggleSubSettingField(triggerId, subPanelId) {
@@ -2488,4 +2494,180 @@ function copyLogToClipboard() {
     }).catch(() => {
         showToast(t('toast_log_copy_fail'), 'error');
     });
+}
+
+/* ===== Network Latency Monitor ===== */
+
+// Reflects real backend state (whether service.sh's monitor loop is alive)
+// by checking for the existence of TIME_RES_FILE, rather than trusting local UI state,
+// so the toggle stays correct across tab switches / page reloads.
+function syncLatencyMonitorState() {
+    execShell(`[ -f '${TIME_RES_FILE}' ] && echo 1 || echo 0`, (output) => {
+        const isRunning = output.trim() === '1';
+        const toggle = document.getElementById('latency-monitor-toggle');
+        if (toggle) toggle.checked = isRunning;
+
+        renderLatencyChart();
+
+        if (isRunning) {
+            startLatencyPolling();
+        } else {
+            stopLatencyPolling();
+            const dot = document.getElementById('latency-status-dot');
+            dot && dot.classList.remove('live');
+        }
+    });
+}
+
+function toggleLatencyMonitor() {
+    const enabled = document.getElementById('latency-monitor-toggle')?.checked;
+
+    if (enabled) {
+        execShell(`sh ${MODDIR}/proxy_control.sh start_monitor_latency`, () => {
+            _latencySamples = [];
+            renderLatencyChart();
+            updateLatencyStats();
+            startLatencyPolling();
+            showToast(t('toast_latency_started'), 'success');
+        });
+    } else {
+        stopLatencyPolling();
+        const dot = document.getElementById('latency-status-dot');
+        dot && dot.classList.remove('live');
+        execShell(`sh ${MODDIR}/proxy_control.sh stop_monitor_latency`, () => {
+            showToast(t('toast_latency_stopped'), 'info');
+        });
+    }
+}
+
+function startLatencyPolling() {
+    stopLatencyPolling();
+    pollLatency();
+    _latencyPollTimer = setInterval(pollLatency, 1000);
+}
+
+function stopLatencyPolling() {
+    if (_latencyPollTimer) {
+        clearInterval(_latencyPollTimer);
+        _latencyPollTimer = null;
+    }
+}
+
+function pollLatency() {
+    execShell(`cat '${TIME_RES_FILE}' 2>/dev/null`, (output) => {
+        const dot = document.getElementById('latency-status-dot');
+        const raw = (output || '').trim();
+        const num = parseFloat(raw);
+        // service.sh writes seconds (curl's %{time_starttransfer}); empty/0/NaN means
+        // the probe timed out or never completed within curl's --max-time window.
+        const ms = (raw !== '' && !isNaN(num) && num > 0) ? Math.round(num * 1000) : null;
+
+        _latencySamples.push({ ms });
+        if (_latencySamples.length > LATENCY_MAX_SAMPLES) {
+            _latencySamples.shift();
+        }
+
+        dot && dot.classList.add('live');
+        updateLatencyStats();
+        renderLatencyChart();
+    });
+}
+
+function updateLatencyStats() {
+    const last = _latencySamples[_latencySamples.length - 1];
+    const valueEl = document.getElementById('latency-current-value');
+    if (valueEl) {
+        const hasLast = last && last.ms !== null;
+        valueEl.textContent = hasLast ? `${last.ms} ms` : (last ? t('latency_timeout_label') : '— ms');
+        valueEl.classList.toggle('latency-current-value--timeout', !!last && !hasLast);
+    }
+
+    const valid = _latencySamples.filter(s => s.ms !== null).map(s => s.ms);
+    const lossPct = _latencySamples.length
+        ? Math.round(((_latencySamples.length - valid.length) / _latencySamples.length) * 100)
+        : 0;
+
+    const avgEl = document.getElementById('latency-stat-avg');
+    const minEl = document.getElementById('latency-stat-min');
+    const maxEl = document.getElementById('latency-stat-max');
+    const lossEl = document.getElementById('latency-stat-loss');
+
+    avgEl && (avgEl.textContent = valid.length ? `${Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)} ms` : '—');
+    minEl && (minEl.textContent = valid.length ? `${Math.min(...valid)} ms` : '—');
+    maxEl && (maxEl.textContent = valid.length ? `${Math.max(...valid)} ms` : '—');
+    lossEl && (lossEl.textContent = _latencySamples.length ? `${lossPct}%` : '—');
+}
+
+function renderLatencyChart() {
+    const svg = document.getElementById('latency-chart-svg');
+    const emptyState = document.getElementById('latency-empty-state');
+    if (!svg) return;
+
+    if (_latencySamples.length === 0) {
+        svg.innerHTML = '';
+        emptyState && (emptyState.style.display = '');
+        return;
+    }
+    emptyState && (emptyState.style.display = 'none');
+
+    const wrap = document.getElementById('latency-chart-wrap');
+    const width = Math.max(wrap ? wrap.clientWidth : 600, 100);
+    const height = 200;
+    const pad = 10;
+    svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    const n = LATENCY_MAX_SAMPLES;
+    const slotW = (width - pad * 2) / Math.max(n - 1, 1);
+    const validValues = _latencySamples.filter(s => s.ms !== null).map(s => s.ms);
+    const dataMax = validValues.length ? Math.max(...validValues) : 300;
+    const chartMax = Math.max(3000, Math.ceil((dataMax * 1.25) / 100) * 100);
+    const top = pad;
+    const bottom = height - pad;
+    const usableH = bottom - top;
+    const yFor = (ms) => bottom - (Math.min(ms, chartMax) / chartMax) * usableH;
+
+    const parts = [];
+
+    // Gridlines + scale labels
+    [0, 0.5, 1].forEach((f) => {
+        const y = bottom - f * usableH;
+        parts.push(`<line x1="${pad}" y1="${y}" x2="${width - pad}" y2="${y}" stroke="var(--md-outline-variant)" stroke-width="1" stroke-dasharray="3,4"/>`);
+        parts.push(`<text x="${pad + 4}" y="${Math.max(y - 4, 10)}" font-size="10" fill="var(--md-on-surface-variant)" font-family="var(--md-font-mono)">${Math.round(f * chartMax)}ms</text>`);
+    });
+
+    // Green line segments for successful samples, red bands for timeouts
+    let linePoints = [];
+    const flushLine = () => {
+        if (linePoints.length > 1) {
+            parts.push(`<polyline points="${linePoints.join(' ')}" fill="none" stroke="var(--md-success)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`);
+        } else if (linePoints.length === 1) {
+            const [x, y] = linePoints[0].split(',');
+            parts.push(`<circle cx="${x}" cy="${y}" r="2.5" fill="var(--md-success)"/>`);
+        }
+        linePoints = [];
+    };
+
+    _latencySamples.forEach((s, i) => {
+        const x = pad + i * slotW;
+        if (s.ms === null) {
+            flushLine();
+            const bandW = Math.max(slotW, 3);
+            parts.push(`<rect x="${x - bandW / 2}" y="${top}" width="${bandW}" height="${usableH}" fill="var(--md-error)" opacity="0.28"/>`);
+        } else {
+            linePoints.push(`${x},${yFor(s.ms)}`);
+        }
+    });
+    flushLine();
+
+    // Highlight the most recent successful sample
+    for (let i = _latencySamples.length - 1; i >= 0; i--) {
+        if (_latencySamples[i].ms !== null) {
+            const x = pad + i * slotW;
+            const y = yFor(_latencySamples[i].ms);
+            parts.push(`<circle cx="${x}" cy="${y}" r="3.5" fill="var(--md-success)" stroke="var(--md-surface)" stroke-width="1.5"/>`);
+            break;
+        }
+    }
+
+    svg.innerHTML = parts.join('');
 }
