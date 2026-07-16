@@ -28,6 +28,7 @@ fi
 exec > "$DATADIR/service.log" 2>&1
 
 PIDFILE="$STUB_DIR/run/xray.pid"
+TIME_RES_FILE="$STUB_DIR/run/time_res"
 
 # Control pipe for receiving commands from the UI or other components
 PIPE_FILE="$STUB_DIR/run/control.pipe"
@@ -151,6 +152,18 @@ monitor_net_interfaces() {
         echo "Network interface switched directly to: $new"
         apply_mark_rule "$new" && cur="$new"
     done
+}
+
+monitor_network_latency() {
+    local URL="https://gstatic.com/generate_204"
+    local TIME_RES
+    touch "$TIME_RES_FILE"
+    while [ -f "$TIME_RES_FILE" ]; do
+        TIME_RES=$(${MODDIR}/bin/curl --socks5-hostname "${TUN_ADDR}:${TUN_PORT}" -s -w "%{time_starttransfer}" --max-time 3 -o /dev/null "$URL" 2>/dev/null)
+        echo -n "$TIME_RES" > "$TIME_RES_FILE"
+        sleep 1
+    done
+    rm -rf "$TIME_RES_FILE"
 }
 
 apply_routing_rules() {
@@ -360,6 +373,25 @@ do_job() {
         fi
         umount_proc_with_name "monitor_net_interfaces"
         MONITOR_PID=0
+        return 0
+    fi
+    if [ "$content" = "start_monitor_latency" ]; then
+        [ $MONITOR_PID -gt 0 ] && is_proc_running "monitor_network_latency" && kill -9 "$MONITOR_PID"
+        MONITOR_PID=0
+        monitor_network_latency &
+        MONITOR_PID=$!
+        mount_proc_with_name "$MONITOR_PID" "monitor_network_latency"
+        echo "monitor_network_latency is running with PID $MONITOR_PID"
+        return 0
+    fi
+    if [ "$content" = "stop_monitor_latency" ]; then
+        if [ $MONITOR_PID -gt 0 ] && is_proc_running "monitor_network_latency"; then
+            kill -9 "$MONITOR_PID"
+            echo "killed monitor_network_latency is with PID $MONITOR_PID"
+        fi
+        umount_proc_with_name "monitor_network_latency"
+        MONITOR_PID=0
+        rm -rf "$TIME_RES_FILE"
         return 0
     fi
     return 1

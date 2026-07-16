@@ -54,10 +54,22 @@ reapply() {
     echo "wait" > "$PIPE_FILE"
 }
 
+start_monitor_latency() {
+    echo "start_monitor_latency" > "$PIPE_FILE"
+    echo "wait" > "$PIPE_FILE"
+}
+
+stop_monitor_latency() {
+    echo "stop_monitor_latency" > "$PIPE_FILE"
+    echo "wait" > "$PIPE_FILE"
+}
+
 case "$1" in
     start) start_proxy ;;
     stop) stop_proxy; rm -rf "$DATADIR/config.json" ;;
     restart) stop_proxy; sleep 1; start_proxy ;;
     status) get_status ;;
     reapply) reapply ;;
+    start_monitor_latency) start_monitor_latency;;
+    stop_monitor_latency) stop_monitor_latency;;
 esac
