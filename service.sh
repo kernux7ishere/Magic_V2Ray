@@ -131,6 +131,7 @@ apply_mark_rule() {
     $ip rule add fwmark $FWMARK table "$iface_index" priority $RULE_PRIORITY
     $ip -6 rule add fwmark $FWMARK table "$iface_index" priority $RULE_PRIORITY
     echo "Applied: fwmark $FWMARK -> table $iface_index ($iface)"
+    return 0
 }
 
 monitor_net_interfaces() {
@@ -144,16 +145,11 @@ monitor_net_interfaces() {
         echo "No active interface detected at startup."
     fi
     $ip monitor route | while read -r line; do
-        case "$line" in
-            "default "*|"Deleted default "*|"throw default "*)
-                new=$(get_active_interface)
-                [ -z "$new" ] && continue
-                [ "$new" == "$cur" ] && continue
-                cur="$new"
-                echo "Network interface switched directly to: $cur"
-                apply_mark_rule "$cur"
-                ;;
-        esac
+        new=$(get_active_interface)
+        [ -z "$new" ] && continue
+        [ "$new" == "$cur" ] && continue
+        echo "Network interface switched directly to: $new"
+        apply_mark_rule "$new" && cur="$new"
     done
 }
 
