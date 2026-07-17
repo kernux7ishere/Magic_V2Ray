@@ -191,6 +191,13 @@ apply_routing_rules() {
     # STEP 3: Add iptables rules to mark packets from tun2socks and route them through the tun device
     $iptables -t mangle -N XRAY_MARK
     $iptables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
+    $iptables -t mangle -A XRAY_MARK -d 127.0.0.0/8 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -d 10.0.0.0/8 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -d 172.16.0.0/12 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -d 192.168.0.0/16 -j RETURN
+    $iptables -t mangle -A XRAY_MARK -d 169.254.0.0/16 -j RETURN       # Link-local
+    $iptables -t mangle -A XRAY_MARK -d 224.0.0.0/4 -j RETURN         # Multicast
+    $iptables -t mangle -A XRAY_MARK -d 240.0.0.0/4 -j RETURN         # Class E (Reserved)
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
@@ -229,6 +236,10 @@ apply_routing_rules() {
     # STEP 3: Add ip6tables rules to mark packets from tun2socks and route them through the tun device
     $ip6tables -t mangle -N XRAY_MARK
     $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -d ::1/128 -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -d fe80::/10 -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -d fc00::/7 -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -d ff00::/8 -j RETURN
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
