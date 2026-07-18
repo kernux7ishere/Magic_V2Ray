@@ -2253,6 +2253,98 @@ function persistRoutingRules() {
     });
 }
 
+// ===== Import / Export Routing Presets (JSON) =====
+
+function _rtSplitCsv(v) {
+    return (typeof v === 'string' ? v : '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+}
+
+function _rtToCsv(v) {
+    if (Array.isArray(v)) return v.map(s => String(s).trim()).filter(Boolean).join(',');
+    return typeof v === 'string' ? v : '';
+}
+
+function openImportRoutingModal() {
+    document.getElementById('import-routing-textarea').value = '';
+    document.getElementById('import-routing-modal').style.display = 'block';
+}
+
+function closeImportRoutingModal() {
+    document.getElementById('import-routing-modal').style.display = 'none';
+}
+
+function importRoutingRulesFromJson() {
+    const raw = document.getElementById('import-routing-textarea').value.trim();
+    if (!raw) return;
+
+    let parsed;
+    try {
+        parsed = JSON.parse(raw);
+    } catch (e) {
+        showToast(t('toast_rules_import_invalid'), 'error');
+        return;
+    }
+
+    if (!Array.isArray(parsed)) {
+        showToast(t('toast_rules_import_invalid'), 'error');
+        return;
+    }
+
+    const imported = parsed.map(raw => ({
+        remarks: raw.remarks || '',
+        locked: !!raw.locked,
+        domain: _rtToCsv(raw.domain),
+        ip: _rtToCsv(raw.ip),
+        port: raw.port !== undefined && raw.port !== null ? String(raw.port) : '',
+        protocol: _rtToCsv(raw.protocol),
+        network: raw.network || '',
+        outboundTag: raw.outboundTag || 'proxy',
+        enabled: raw.enabled !== false
+    }));
+
+    if (!Array.isArray(advSettings.routingRules)) advSettings.routingRules = [];
+    // Presets replace unlocked rules; locked rules are preserved as-is.
+    const keptLocked = advSettings.routingRules.filter(r => r.locked);
+    advSettings.routingRules = keptLocked.concat(imported);
+
+    closeImportRoutingModal();
+    renderRoutingRules();
+    persistRoutingRules();
+    showToast(t('toast_rules_imported'), 'success');
+}
+
+function exportRoutingRulesToClipboard() {
+    const rules = Array.isArray(advSettings.routingRules) ? advSettings.routingRules : [];
+    const exportArr = rules.map(rule => {
+        const obj = {};
+        if (rule.remarks) obj.remarks = rule.remarks;
+        obj.enabled = rule.enabled !== false;
+        obj.locked = !!rule.locked;
+
+        const domain = _rtSplitCsv(rule.domain);
+        if (domain.length) obj.domain = domain;
+        const ip = _rtSplitCsv(rule.ip);
+        if (ip.length) obj.ip = ip;
+        if (rule.port && String(rule.port).trim()) obj.port = String(rule.port).trim();
+        const protocol = _rtSplitCsv(rule.protocol);
+        if (protocol.length) obj.protocol = protocol;
+        if (rule.network && String(rule.network).trim()) obj.network = rule.network.trim();
+
+        obj.outboundTag = rule.outboundTag || 'proxy';
+        return obj;
+    });
+
+    const jsonStr = JSON.stringify(exportArr);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+        showToast(t('toast_rules_exported'), 'success');
+    }).catch(() => {
+        showToast(t('toast_rules_export_fail'), 'error');
+    });
+}
+
 function showToast(message, type = 'success') {
     const container = document.getElementById('toast-container');
     if (!container) return;
