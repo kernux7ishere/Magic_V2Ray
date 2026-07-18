@@ -2221,9 +2221,10 @@ function toggleRoutingRuleEnabled(index) {
     persistRoutingRules();
 }
 
-function deleteRoutingRule(index) {
+async function deleteRoutingRule(index) {
     if (!advSettings.routingRules[index]) return;
-    if (!confirm(t('confirm_delete_rule'))) return;
+    const ok = await showConfirm(t('confirm_delete_rule'));
+    if (!ok) return;
     advSettings.routingRules.splice(index, 1);
     renderRoutingRules();
     persistRoutingRules();
@@ -2342,6 +2343,35 @@ function exportRoutingRulesToClipboard() {
         showToast(t('toast_rules_exported'), 'success');
     }).catch(() => {
         showToast(t('toast_rules_export_fail'), 'error');
+    });
+}
+
+// Promise-based confirm dialog backed by a DOM modal — KSU webui does not
+// support window.confirm()/window.alert(). Usage: if (await showConfirm(msg)) { ... }
+function showConfirm(message, options = {}) {
+    return new Promise(resolve => {
+        const overlay = document.getElementById('confirm-modal-overlay');
+        const okBtn = document.getElementById('confirm-modal-ok');
+        const cancelBtn = document.getElementById('confirm-modal-cancel');
+        if (!overlay || !okBtn || !cancelBtn) {
+            // Fallback should the modal markup ever be missing.
+            resolve(true);
+            return;
+        }
+
+        document.getElementById('confirm-modal-message').textContent = message;
+        okBtn.textContent = options.okText || t('confirm_ok');
+        cancelBtn.textContent = options.cancelText || t('confirm_cancel');
+        overlay.style.display = 'flex';
+
+        const cleanup = (result) => {
+            overlay.style.display = 'none';
+            okBtn.onclick = null;
+            cancelBtn.onclick = null;
+            resolve(result);
+        };
+        okBtn.onclick = () => cleanup(true);
+        cancelBtn.onclick = () => cleanup(false);
     });
 }
 

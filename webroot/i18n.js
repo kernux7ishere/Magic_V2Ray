@@ -237,6 +237,8 @@ const i18n = {
         toast_rules_exported: "Routing presets copied to clipboard.",
         toast_rules_export_fail: "Failed to copy presets to clipboard.",
         toast_rules_import_invalid: "Invalid JSON — expected an array of routing rules.",
+        confirm_ok: "OK",
+        confirm_cancel: "Cancel",
     },
     zh: {
         tab_dashboard: "仪表盘",
@@ -476,6 +478,8 @@ const i18n = {
         toast_rules_exported: "路由预设已复制到剪贴板。",
         toast_rules_export_fail: "复制预设到剪贴板失败。",
         toast_rules_import_invalid: "JSON 无效——需要一个路由规则数组。",
+        confirm_ok: "确定",
+        confirm_cancel: "取消",
     },
     "zh-tw": {
         tab_dashboard: "儀表板",
@@ -715,6 +719,8 @@ const i18n = {
         toast_rules_exported: "路由預設集已複製到剪貼簿。",
         toast_rules_export_fail: "複製預設集到剪貼簿失敗。",
         toast_rules_import_invalid: "JSON 無效──需要一個路由規則陣列。",
+        confirm_ok: "確定",
+        confirm_cancel: "取消",
     },
     vi: {
         tab_dashboard: "Bảng Điều Khiển",
@@ -954,5 +960,7 @@ const i18n = {
         toast_rules_exported: "Đã sao chép preset định tuyến vào clipboard.",
         toast_rules_export_fail: "Sao chép preset thất bại.",
         toast_rules_import_invalid: "JSON không hợp lệ — cần một mảng các quy tắc định tuyến.",
+        confirm_ok: "Đồng ý",
+        confirm_cancel: "Hủy",
     }
 };

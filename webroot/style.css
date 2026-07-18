@@ -565,6 +565,63 @@ textarea::placeholder { color: var(--md-outline); }
     transition: color .2s, background .2s;
 }
 
+/* ===== Confirm Modal ===== */
+.confirm-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.confirm-window {
+    width: min(340px, 88vw);
+    border-radius: var(--md-shape-xl);
+    overflow: hidden;
+}
+
+.confirm-body {
+    padding: 24px 20px 8px;
+}
+
+.confirm-body p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--md-on-surface);
+    white-space: pre-line;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 16px 20px 20px;
+}
+
+.btn-confirm-cancel,
+.btn-confirm-ok {
+    border: none;
+    border-radius: var(--md-shape-full);
+    padding: 9px 18px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter .15s;
+}
+.btn-confirm-cancel {
+    background: transparent;
+    color: var(--md-on-surface-variant);
+}
+.btn-confirm-cancel:hover {
+    background: rgba(208, 188, 255, 0.1);
+}
+.btn-confirm-ok {
+    background: var(--md-error);
+    color: var(--md-on-error);
+}
+.btn-confirm-ok:hover {
+    filter: brightness(1.08);
+}
+
 /* ===== Routing Settings Panel ===== */
 .routing-panel-header {
     display: flex;
