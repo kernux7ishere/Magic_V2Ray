@@ -602,6 +602,158 @@ textarea::placeholder { color: var(--md-outline); }
     transition: color .2s, background .2s;
 }
 
+/* ===== Routing Settings Panel ===== */
+.routing-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+
+.routing-panel-header h3 {
+    font-family: var(--md-font-display);
+    font-size: 20px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--md-on-surface);
+    letter-spacing: -.2px;
+}
+
+.routing-empty-state {
+    text-align: center;
+    padding: 40px 16px;
+    color: var(--md-on-surface-variant);
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.routing-rule-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    background: var(--md-surface-1);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-lg);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+}
+
+.routing-rule-row.rule-disabled {
+    opacity: .55;
+}
+
+.routing-rule-info {
+    flex: 1;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.routing-rule-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--md-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.routing-rule-meta {
+    font-size: 12px;
+    color: var(--md-on-surface-variant);
+    font-family: var(--md-font-mono);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.routing-rule-outbound-badge {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .4px;
+    padding: 2px 8px;
+    border-radius: var(--md-shape-full);
+    margin-top: 4px;
+}
+.routing-rule-outbound-badge.tag-proxy {
+    background: var(--md-primary-container);
+    color: var(--md-on-primary-container);
+}
+.routing-rule-outbound-badge.tag-direct {
+    background: var(--md-success-container);
+    color: var(--md-on-success-container);
+}
+.routing-rule-outbound-badge.tag-block {
+    background: var(--md-error-container);
+    color: var(--md-on-error-container);
+}
+
+.routing-rule-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.routing-rule-actions input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 44px;
+    height: 26px;
+    background: var(--md-outline);
+    border-radius: var(--md-shape-full);
+    position: relative;
+    cursor: pointer;
+    outline: none;
+    transition: background .2s var(--md-motion-standard);
+    flex-shrink: 0;
+    border: 2px solid var(--md-outline);
+}
+.routing-rule-actions input[type="checkbox"]:checked {
+    background: var(--md-primary);
+    border-color: var(--md-primary);
+}
+.routing-rule-actions input[type="checkbox"]::before {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--md-surface);
+    top: 50%; left: 4px;
+    transform: translateY(-50%);
+    transition: transform .2s var(--md-motion-enter), width .1s, height .1s, background .2s;
+}
+.routing-rule-actions input[type="checkbox"]:checked::before {
+    transform: translateX(16px) translateY(-50%);
+    background: var(--md-on-primary);
+    width: 18px; height: 18px;
+    left: 2px;
+}
+
+.routing-rule-icon-btn {
+    background: none;
+    border: none;
+    color: var(--md-on-surface-variant);
+    padding: 6px;
+    cursor: pointer;
+    border-radius: var(--md-shape-full);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .2s, color .2s;
+}
+.routing-rule-icon-btn:hover {
+    background: rgba(208, 188, 255, 0.1);
+    color: var(--md-on-surface);
+}
+.routing-rule-icon-btn.btn-delete-item:hover {
+    background: rgba(242,184,181,0.1);
+    color: var(--md-error);
+}
+
 /* ===== Settings Panel ===== */
 .settings-form-panel h3 {
     font-family: var(--md-font-display);

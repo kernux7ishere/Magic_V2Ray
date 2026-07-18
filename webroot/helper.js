@@ -79,6 +79,13 @@ function convert_chain_uris_to_xray_json(hop1Uri, hop2Uri, optional_settings) {
             streamSettings: {
                 sockopt: { mark: 255 }
             }
+        },
+        {
+            protocol: "blackhole",
+            tag: "block",
+            settings: {
+                response: { type: "http" }
+            }
         }
     ];
 
@@ -138,6 +145,39 @@ function convert_chain_uris_to_xray_json(hop1Uri, hop2Uri, optional_settings) {
     return JSON.stringify(fullConfig, null, 2);
 }
 
+// Converts the user-editable Routing Settings list (advSettings.routingRules)
+// into Xray "field" routing rule objects. Only domain/ip matching is supported
+// (no process/package name yet). Disabled rules are skipped entirely.
+function _buildCustomRoutingRules(routingRules) {
+    if (!Array.isArray(routingRules)) return [];
+
+    const splitCsv = v => (typeof v === 'string' ? v : '')
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+
+    return routingRules
+        .filter(r => r && r.enabled !== false)
+        .map(r => {
+            const rule = { "type": "field" };
+            const domain = splitCsv(r.domain);
+            const ip = splitCsv(r.ip);
+            const protocol = splitCsv(r.protocol);
+
+            if (domain.length) rule.domain = domain;
+            if (ip.length) rule.ip = ip;
+            if (r.port && String(r.port).trim()) rule.port = String(r.port).trim();
+            if (r.network && String(r.network).trim()) rule.network = String(r.network).trim();
+            if (protocol.length) rule.protocol = protocol;
+            rule.outboundTag = r.outboundTag || "proxy";
+
+            return rule;
+        })
+        // A rule with no matching conditions at all would be a no-op (or worse,
+        // an accidental catch-all) — drop it defensively.
+        .filter(rule => rule.domain || rule.ip || rule.port || rule.protocol);
+}
+
 function convert_uri_to_xray_json(uri, optional_settings) {
     const settings = optional_settings || {
         loglevel: "none",
@@ -157,7 +197,8 @@ function convert_uri_to_xray_json(uri, optional_settings) {
         fakeDnsLocal: false,
         vpnDns: "1.1.1.1",
         foreignDns: "1.1.1.1",
-        domesticDns: "223.5.5.5"
+        domesticDns: "223.5.5.5",
+        routingRules: []
     };
 
     const b64decode = s => {
@@ -801,6 +842,13 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                         mark: 255
                     }
                 }
+            },
+            {
+                "protocol": "blackhole",
+                "tag": "block",
+                "settings": {
+                    "response": { "type": "http" }
+                }
             }
         ],
         routing: {
@@ -830,6 +878,10 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                     "ip": ["198.18.0.0/15"],
                     "outboundTag": "proxy"
                 }] : []),
+                // User-defined routing rules (Routing Settings tab). Evaluated in the
+                // order the user arranged them, above the private-network bypass so a
+                // custom rule can override it if the user explicitly wants to.
+                ..._buildCustomRoutingRules(settings.routingRules),
                 {
                     "type": "field",
                     "ip": [

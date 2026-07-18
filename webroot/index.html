@@ -24,6 +24,7 @@
         <div class="tabs-navigation">
             <button class="tab-btn active" onclick="switchTab('tab-dashboard')" data-i18n="tab_dashboard">Dashboard</button>
             <button class="tab-btn" onclick="switchTab('tab-settings')" data-i18n="tab_settings">Traffic Settings</button>
+            <button class="tab-btn" onclick="switchTab('tab-routing')" data-i18n="tab_routing">Routing Settings</button>
             <button class="tab-btn" onclick="switchTab('tab-log')" data-i18n="tab_log">Xray Log</button>
             <button class="tab-btn" onclick="switchTab('tab-latency')" data-i18n="tab_latency">Network Latency</button>
         </div>
@@ -189,7 +190,21 @@
                 <button class="btn btn-primary btn-save-settings" onclick="saveAdvancedSettingsForm()" data-i18n="btn_save_settings">Save & Apply Configurations</button>
             </section>
         </div>
-        
+
+        <!-- ===== Routing Settings Tab ===== -->
+        <div id="tab-routing" class="tab-content">
+            <section class="routing-panel">
+                <div class="routing-panel-header">
+                    <h3 data-i18n="routing_title">Routing Settings</h3>
+                    <button class="btn-add-node" onclick="openAddRoutingRuleModal()" title="Add rule">+</button>
+                </div>
+                <div id="routing-rules-container"></div>
+                <div id="routing-empty-state" class="routing-empty-state" style="display:none;">
+                    <span data-i18n="routing_empty">No custom routing rules yet.<br>Tap + to add a domain or IP rule.</span>
+                </div>
+            </section>
+        </div>
+
         <!-- ===== Log Tab ===== -->
         <div id="tab-log" class="tab-content">
             <section class="log-panel">
@@ -660,6 +675,68 @@
                 </div>
                 <div class="chain-arrow">↓</div>
                 <div class="chain-internet-label" data-i18n="chain_internet">🌐 Internet</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routing Rule Modal -->
+    <div id="routing-rule-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-window">
+            <header class="modal-header">
+                <button class="modal-icon-btn" onclick="closeRoutingRuleModal()">←</button>
+                <h2 id="routing-rule-modal-title" data-i18n="modal_add_rule_title">Add Routing Rule</h2>
+                <button class="modal-icon-btn check-btn" onclick="saveRoutingRule()">✓</button>
+            </header>
+            <div class="modal-body">
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_remarks">Remarks</label>
+                    <input type="text" id="rule-remarks">
+                </div>
+
+                <div class="setting-item-row toggle-row" style="padding: 0 4px;">
+                    <label for="rule-locked"><span data-i18n="lbl_rule_locked">Locked, keep this rule when import presets</span></label>
+                    <input type="checkbox" id="rule-locked">
+                </div>
+
+                <div class="modal-section-divider" data-i18n="modal_section_rule_settings">Routing Rule Settings</div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_domain">domain</label>
+                    <input type="text" id="rule-domain" data-i18n-placeholder="rule_match_placeholder" placeholder="Separated by commas(,), e.g. google.com">
+                </div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_ip">ip</label>
+                    <input type="text" id="rule-ip" data-i18n-placeholder="rule_match_placeholder" placeholder="Separated by commas(,), e.g. 1.1.1.1">
+                </div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_port">port</label>
+                    <input type="text" id="rule-port" placeholder="443 or 1000-2000">
+                </div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_protocol">protocol</label>
+                    <input type="text" id="rule-protocol" placeholder="http,tls,bittorrent">
+                </div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_network">network</label>
+                    <select id="rule-network">
+                        <option value="">tcp,udp</option>
+                        <option value="tcp">tcp</option>
+                        <option value="udp">udp</option>
+                    </select>
+                </div>
+
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_outbound_tag">outboundTag</label>
+                    <select id="rule-outbound">
+                        <option value="proxy" data-i18n="opt_outbound_proxy">proxy</option>
+                        <option value="direct" data-i18n="opt_outbound_direct">direct</option>
+                        <option value="block" data-i18n="opt_outbound_block">block</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>

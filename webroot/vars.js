@@ -27,13 +27,17 @@ let advSettings = {
     fakeDnsLocal: false,
     vpnDns: "1.1.1.1",
     foreignDns: "1.1.1.1",
-    domesticDns: "223.5.5.5"
+    domesticDns: "223.5.5.5",
+    routingRules: []
 };
 let currentLang = 'en';
 let currentEditingCategory = null;
 let currentEditingNodeId = null;
 let currentEditingProtocol = null;
 let categoryExpandedState = {};
+
+// Routing Settings tab
+let currentEditingRuleIndex = null;
 
 // Logging
 let _logAutoRefreshTimer = null;

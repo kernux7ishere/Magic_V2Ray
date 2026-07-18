@@ -1913,6 +1913,10 @@ function switchTab(tabId) {
     } else {
         stopLatencyPolling();
     }
+
+    if (tabId === 'tab-routing') {
+        renderRoutingRules();
+    }
 }
 
 function toggleSubSettingField(triggerId, subPanelId) {
@@ -1996,6 +2000,9 @@ function bindSettingsToFormView() {
     toggleSubSettingField('set-fragment', 'fragment-sub-fields');
 
     document.getElementById('set-mtu').value = advSettings.mtu || 1350;
+
+    if (!Array.isArray(advSettings.routingRules)) advSettings.routingRules = [];
+    renderRoutingRules();
 }
 
 function saveAdvancedSettingsForm(isLangOnly = false) {
@@ -2049,6 +2056,200 @@ function saveAdvancedSettingsForm(isLangOnly = false) {
                 return;
             }
         }
+    });
+}
+
+// ===== Routing Settings tab =====
+
+function _summarizeRoutingRule(rule) {
+    const parts = [];
+    if (rule.domain && rule.domain.trim()) parts.push(`domain: ${rule.domain.trim()}`);
+    if (rule.ip && rule.ip.trim()) parts.push(`ip: ${rule.ip.trim()}`);
+    if (rule.port && String(rule.port).trim()) parts.push(`port: ${String(rule.port).trim()}`);
+    if (rule.protocol && rule.protocol.trim()) parts.push(`protocol: [${rule.protocol.trim()}]`);
+    if (rule.network && rule.network.trim()) parts.push(`network: [${rule.network.trim()}]`);
+    return parts.join('  ·  ') || t('rule_no_conditions');
+}
+
+function renderRoutingRules() {
+    const container = document.getElementById('routing-rules-container');
+    const emptyState = document.getElementById('routing-empty-state');
+    if (!container) return;
+
+    const rules = Array.isArray(advSettings.routingRules) ? advSettings.routingRules : [];
+    container.innerHTML = '';
+
+    if (rules.length === 0) {
+        if (emptyState) emptyState.style.display = 'block';
+        return;
+    }
+    if (emptyState) emptyState.style.display = 'none';
+
+    rules.forEach((rule, index) => {
+        const row = document.createElement('div');
+        row.className = `routing-rule-row${rule.enabled === false ? ' rule-disabled' : ''}`;
+
+        const info = document.createElement('div');
+        info.className = 'routing-rule-info';
+        info.onclick = () => editRoutingRule(index);
+
+        const name = document.createElement('div');
+        name.className = 'routing-rule-name';
+        name.textContent = (rule.remarks && rule.remarks.trim()) || t('rule_untitled');
+        info.appendChild(name);
+
+        const meta = document.createElement('div');
+        meta.className = 'routing-rule-meta';
+        meta.textContent = _summarizeRoutingRule(rule);
+        info.appendChild(meta);
+
+        const badge = document.createElement('span');
+        const tag = rule.outboundTag || 'proxy';
+        badge.className = `routing-rule-outbound-badge tag-${tag}`;
+        badge.textContent = tag;
+        info.appendChild(badge);
+
+        row.appendChild(info);
+
+        const actions = document.createElement('div');
+        actions.className = 'routing-rule-actions';
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'routing-rule-icon-btn';
+        editBtn.title = t('menu_edit');
+        editBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>';
+        editBtn.onclick = (e) => { e.stopPropagation(); editRoutingRule(index); };
+        actions.appendChild(editBtn);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'routing-rule-icon-btn btn-delete-item';
+        delBtn.title = t('btn_delete');
+        delBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+        delBtn.onclick = (e) => { e.stopPropagation(); deleteRoutingRule(index); };
+        actions.appendChild(delBtn);
+
+        const toggle = document.createElement('input');
+        toggle.type = 'checkbox';
+        toggle.checked = rule.enabled !== false;
+        toggle.onchange = () => toggleRoutingRuleEnabled(index);
+        actions.appendChild(toggle);
+
+        row.appendChild(actions);
+        container.appendChild(row);
+    });
+}
+
+function openAddRoutingRuleModal() {
+    currentEditingRuleIndex = null;
+    document.getElementById('routing-rule-modal-title').setAttribute('data-i18n', 'modal_add_rule_title');
+    document.getElementById('routing-rule-modal-title').innerHTML = t('modal_add_rule_title');
+    document.getElementById('rule-remarks').value = '';
+    document.getElementById('rule-locked').checked = false;
+    document.getElementById('rule-domain').value = '';
+    document.getElementById('rule-ip').value = '';
+    document.getElementById('rule-port').value = '';
+    document.getElementById('rule-protocol').value = '';
+    document.getElementById('rule-network').value = '';
+    document.getElementById('rule-outbound').value = 'proxy';
+    document.getElementById('routing-rule-modal').style.display = 'block';
+}
+
+function editRoutingRule(index) {
+    const rule = advSettings.routingRules[index];
+    if (!rule) return;
+    currentEditingRuleIndex = index;
+    document.getElementById('routing-rule-modal-title').setAttribute('data-i18n', 'modal_edit_rule_title');
+    document.getElementById('routing-rule-modal-title').innerHTML = t('modal_edit_rule_title');
+    document.getElementById('rule-remarks').value = rule.remarks || '';
+    document.getElementById('rule-locked').checked = !!rule.locked;
+    document.getElementById('rule-domain').value = rule.domain || '';
+    document.getElementById('rule-ip').value = rule.ip || '';
+    document.getElementById('rule-port').value = rule.port || '';
+    document.getElementById('rule-protocol').value = rule.protocol || '';
+    document.getElementById('rule-network').value = rule.network || '';
+    document.getElementById('rule-outbound').value = rule.outboundTag || 'proxy';
+    document.getElementById('routing-rule-modal').style.display = 'block';
+}
+
+function closeRoutingRuleModal() {
+    document.getElementById('routing-rule-modal').style.display = 'none';
+    currentEditingRuleIndex = null;
+}
+
+function saveRoutingRule() {
+    const domain = document.getElementById('rule-domain').value.trim();
+    const ip = document.getElementById('rule-ip').value.trim();
+    const port = document.getElementById('rule-port').value.trim();
+    const protocol = document.getElementById('rule-protocol').value.trim();
+
+    if (!domain && !ip && !port && !protocol) {
+        showToast(t('toast_rule_needs_condition'), 'error');
+        return;
+    }
+
+    const rule = {
+        remarks: document.getElementById('rule-remarks').value.trim(),
+        locked: document.getElementById('rule-locked').checked,
+        domain,
+        ip,
+        port,
+        protocol,
+        network: document.getElementById('rule-network').value,
+        outboundTag: document.getElementById('rule-outbound').value,
+        enabled: currentEditingRuleIndex !== null ? (advSettings.routingRules[currentEditingRuleIndex].enabled !== false) : true
+    };
+
+    if (!Array.isArray(advSettings.routingRules)) advSettings.routingRules = [];
+
+    if (currentEditingRuleIndex === null) {
+        advSettings.routingRules.push(rule);
+    } else {
+        advSettings.routingRules[currentEditingRuleIndex] = rule;
+    }
+
+    closeRoutingRuleModal();
+    renderRoutingRules();
+    persistRoutingRules();
+    showToast(t('toast_rule_saved'), 'success');
+}
+
+function toggleRoutingRuleEnabled(index) {
+    const rule = advSettings.routingRules[index];
+    if (!rule) return;
+    rule.enabled = rule.enabled === false; // flip: was disabled -> enable, else disable
+    renderRoutingRules();
+    persistRoutingRules();
+}
+
+function deleteRoutingRule(index) {
+    if (!advSettings.routingRules[index]) return;
+    if (!confirm(t('confirm_delete_rule'))) return;
+    advSettings.routingRules.splice(index, 1);
+    renderRoutingRules();
+    persistRoutingRules();
+    showToast(t('toast_rule_deleted'), 'success');
+}
+
+// Persists advSettings (including routingRules) to disk and, if a proxy is
+// currently active, regenerates its Xray config and restarts if running.
+function persistRoutingRules() {
+    const jsonStr = JSON.stringify(advSettings);
+    const base64Encoded = utoa(jsonStr);
+
+    execShell(`printf '%s' '${base64Encoded}' > '${SETTINGS_FILE}'`, () => {
+        if (!activeConfig) return;
+        const [category, id] = activeConfig.split(':');
+        const node = profiles[category]?.nodes?.find(n => n.id === id);
+        if (!node) return;
+
+        const xrayConfig = _resolveXrayConfig(node.rawUri);
+        execShell(`echo '${xrayConfig}' > '${CONFIG_JSON}'`, () => {
+            execShell(`sh ${MODDIR}/proxy_control.sh status`, (status) => {
+                if (status === 'running') {
+                    toggleService('restart');
+                }
+            });
+        });
     });
 }
 
