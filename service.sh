@@ -206,6 +206,9 @@ apply_routing_rules() {
     # STEP 1: Allow forward traffic between hotspot interfaces and $TUN_NAME
     $iptables -I FORWARD -o $TUN_NAME -j ACCEPT
     $iptables -I FORWARD -i $TUN_NAME -j ACCEPT
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
     # STEP 2: Force hotspot private IP ranges to lookup table 100
     $ip rule add iif lo goto 6000 pref 5000
     $ip rule add iif $TUN_NAME lookup main suppress_prefixlength 0 pref 5010
@@ -244,6 +247,8 @@ apply_routing_rules() {
     # IPv6 Hotspot support
     $ip6tables -I FORWARD -i $TUN_NAME -j ACCEPT
     $ip6tables -I FORWARD -o $TUN_NAME -j ACCEPT
+    $ip6tables -t mangle -I PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -I PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
     $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
     $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
     $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
