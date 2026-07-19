@@ -148,8 +148,13 @@ monitor_net_interfaces() {
     fi
     $ip monitor route | while read -r line; do
         new=$(get_active_interface)
-        [ -z "$new" ] && continue
         [ "$new" == "$cur" ] && continue
+        if [ -z "$new" ]; then
+            echo "Network interface disconnected"
+            cur=""
+            rm -rf "$ADDR_INFO_FILE" 
+            continue
+        fi
         echo "Network interface switched directly to: $new"
         apply_mark_rule "$new" && cur="$new"
         rm -rf "$ADDR_INFO_FILE"
