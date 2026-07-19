@@ -306,6 +306,24 @@
                     </div>
                 </div>
 
+                <div class="ip-hunter-panel" id="ip-hunter-panel">
+                    <div class="latency-toolbar">
+                        <div class="latency-toolbar-left">
+                            <span class="ip-hunter-title" data-i18n="ip_hunter_title">Mobile IP Hunter</span>
+                        </div>
+                        <label class="log-autorefresh-label latency-enable-label">
+                            <input type="checkbox" id="ip-hunter-toggle" onchange="toggleIpHunter()">
+                            <span data-i18n="ip_hunter_enable">Enable IP hunter</span>
+                        </label>
+                    </div>
+                    <div class="ip-hunter-input-row">
+                        <input type="text" id="ip-hunter-prefixes" class="ip-hunter-input"
+                               placeholder="10.120;10.121;10.122" data-i18n-placeholder="ip_hunter_placeholder"
+                               oninput="onIpHunterInputChange()">
+                    </div>
+                    <div class="ip-hunter-hint" data-i18n="ip_hunter_hint">Enter IPv4 network prefixes separated by semicolons (;), e.g. 10.120;10.121;10.122</div>
+                </div>
+
                 <div class="latency-stats-row">
                     <div class="latency-stat">
                         <span class="latency-stat-label" data-i18n="latency_stat_avg">Avg</span>

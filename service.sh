@@ -21,6 +21,7 @@ rm -rf "$DATADIR/xray.log"
 rm -rf "$DATADIR/tun2socks.log"
 XRAY_LOG="$DATADIR/xray.log"
 TUN2SOCKS_LOG=/dev/null
+IP_HUNT_FILE="$DATADIR/ip_hunt.list"
 if [ "$(grep_prop debug)" = "1" ]; then
     set -x
     TUN2SOCKS_LOG="$DATADIR/tun2socks.log"
@@ -44,6 +45,8 @@ MONITOR_PID=0
 ip="/system/bin/ip"
 iptables="/system/bin/iptables"
 ip6tables="/system/bin/ip6tables"
+am="/system/bin/am"
+settings="/system/bin/settings"
 
 RULE_PRIORITY=1000
 FWMARK=255
@@ -136,6 +139,40 @@ apply_mark_rule() {
     return 0
 }
 
+network_reset() {
+    echo "Reset the network"
+    $settings put global airplane_mode_on 1
+    $am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true
+    sleep 3
+    $settings put global airplane_mode_on 0
+    $am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false
+}
+
+check_ip_hunter() {
+    local INET="$1"
+    [ ! -f "$IP_HUNT_FILE" ] && return 0
+    local RAW_PREFIX_LIST="$(cat "$IP_HUNT_FILE" | tr -d '\r')"
+    local IFS=";"
+    local TARGET
+    local CURRENT_IP="$($ip addr show $INET | grep 'inet ' | awk '{print $2}' | cut -d/ -f1)"
+    # Check for every prefix
+    for TARGET in $RAW_PREFIX_LIST; do
+        case "$TARGET" in
+            *.) ;;
+            *) TARGET="$TARGET." ;;
+        esac
+        case "$CURRENT_IP." in
+            "$TARGET"*)
+                echo "Obtained IP: $CURRENT_IP"
+                return 0
+                ;;
+        esac
+    done
+    echo "IP $CURRENT_IP does not match the expected list, continue..."
+    network_reset &
+    return 1
+}
+
 monitor_net_interfaces() {
     local cur=$(get_active_interface)
     local new=""
@@ -159,6 +196,7 @@ monitor_net_interfaces() {
         apply_mark_rule "$new" && cur="$new"
         rm -rf "$ADDR_INFO_FILE"
         $ip addr show "$new" > "$ADDR_INFO_FILE"
+        check_ip_hunter "$new"
     done
 }
 

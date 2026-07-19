@@ -4,6 +4,7 @@ const PROFILES_FILE = `${DATADIR}/profiles.base64`;
 const SETTINGS_FILE = `${DATADIR}/settings.base64`;
 const ACTIVE_FILE = `${DATADIR}/active_config.txt`;
 const CONFIG_JSON = `${DATADIR}/config.json`;
+const IP_HUNT_FILE = `${DATADIR}/ip_hunt.list`;
 const STUB_DIR = "/dev/sysctl_stubs";
 const TIME_RES_FILE = `${STUB_DIR}/run/time_res`;
 const ADDR_INFO_FILE = `${STUB_DIR}/run/addr_info`;
@@ -140,3 +141,6 @@ let _logAllLines = [];
 const LATENCY_MAX_SAMPLES = 60;
 let _latencyPollTimer = null;
 let _latencySamples = [];
+
+// Mobile IP Hunter
+let _ipHunterSaveTimer = null;

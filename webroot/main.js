@@ -1910,6 +1910,7 @@ function switchTab(tabId) {
 
     if (tabId === 'tab-latency') {
         syncLatencyMonitorState();
+        syncIpHunterState();
     } else {
         stopLatencyPolling();
     }
@@ -2948,6 +2949,76 @@ function renderNetworkInterfaceInfo(raw) {
     ifaceEl && (ifaceEl.textContent = iface || none);
     ipv4El && (ipv4El.textContent = ipv4 || none);
     ipv6El && (ipv6El.textContent = ipv6 || none);
+}
+
+/* ===== Mobile IP Hunter ===== */
+
+// Keeps only well-formed IPv4 prefix octets (1-4 dot-separated groups),
+// dropping anything else typed into the field, then rejoins with ';'
+// to match the format the hunter script expects (e.g. "10.120;10.121").
+function sanitizeIpHunterPrefixes(raw) {
+    return (raw || '')
+        .split(/[;,\s]+/)
+        .map(p => p.trim())
+        .filter(p => /^\d{1,3}(\.\d{1,3}){0,3}$/.test(p))
+        .join(';');
+}
+
+// Reflects real backend state by checking for the existence of IP_HUNT_FILE,
+// same approach as syncLatencyMonitorState, so the toggle and field stay
+// correct across tab switches / page reloads.
+function syncIpHunterState() {
+    execShell(
+        `if [ -f '${IP_HUNT_FILE}' ]; then echo 1; cat '${IP_HUNT_FILE}'; else echo 0; fi`,
+        (output) => {
+            const toggle = document.getElementById('ip-hunter-toggle');
+            const input = document.getElementById('ip-hunter-prefixes');
+            const lines = (output || '').split('\n');
+            const enabled = lines[0].trim() === '1';
+            const content = lines.slice(1).join('\n').trim();
+
+            if (toggle) toggle.checked = enabled;
+            if (input) {
+                input.value = content;
+            }
+        }
+    );
+}
+
+function toggleIpHunter() {
+    const toggle = document.getElementById('ip-hunter-toggle');
+    const enabled = !!toggle?.checked;
+
+    if (enabled) {
+        saveIpHunterPrefixes();
+    } else {
+        execShell(`rm -f '${IP_HUNT_FILE}'`, () => {
+            showToast(t('toast_ip_hunter_disabled'), 'info');
+        });
+    }
+}
+
+function onIpHunterInputChange() {
+    const toggle = document.getElementById('ip-hunter-toggle');
+    if (!toggle?.checked) return;
+
+    if (_ipHunterSaveTimer) clearTimeout(_ipHunterSaveTimer);
+    _ipHunterSaveTimer = setTimeout(saveIpHunterPrefixes, 600);
+}
+
+function saveIpHunterPrefixes() {
+    const input = document.getElementById('ip-hunter-prefixes');
+    const sanitized = sanitizeIpHunterPrefixes(input?.value || '');
+    if (input) input.value = sanitized;
+
+    if (!sanitized) {
+        showToast(t('toast_ip_hunter_invalid'), 'error');
+        return;
+    }
+
+    execShell(`mkdir -p '${DATADIR}' && printf '%s' '${sanitized}' > '${IP_HUNT_FILE}'`, () => {
+        showToast(t('toast_ip_hunter_saved'), 'success');
+    });
 }
 
 function updateLatencyStats() {
