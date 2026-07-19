@@ -29,6 +29,7 @@ exec > "$DATADIR/service.log" 2>&1
 
 PIDFILE="$STUB_DIR/run/xray.pid"
 TIME_RES_FILE="$STUB_DIR/run/time_res"
+ADDR_INFO_FILE="$STUB_DIR/run/addr_info"
 
 # Control pipe for receiving commands from the UI or other components
 PIPE_FILE="$STUB_DIR/run/control.pipe"
@@ -151,6 +152,8 @@ monitor_net_interfaces() {
         [ "$new" == "$cur" ] && continue
         echo "Network interface switched directly to: $new"
         apply_mark_rule "$new" && cur="$new"
+        rm -rf "$ADDR_INFO_FILE"
+        $ip addr show "$new" > "$ADDR_INFO_FILE"
     done
 }
 
