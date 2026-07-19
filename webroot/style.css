@@ -1533,6 +1533,39 @@ select option:active {
     margin-left: auto;
 }
 
+.latency-network-info {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.latency-network-item {
+    flex: 1;
+    min-width: 140px;
+    background: var(--md-surface-2);
+    border: 1px solid var(--md-outline-variant);
+    border-radius: var(--md-shape-md);
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.latency-network-label {
+    font-size: 11px;
+    color: var(--md-on-surface-variant);
+    text-transform: uppercase;
+    letter-spacing: .4px;
+}
+.latency-network-value {
+    font-family: var(--md-font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--md-on-surface);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .latency-stats-row {
     display: flex;
     gap: 10px;

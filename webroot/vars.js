@@ -6,6 +6,7 @@ const ACTIVE_FILE = `${DATADIR}/active_config.txt`;
 const CONFIG_JSON = `${DATADIR}/config.json`;
 const STUB_DIR = "/dev/sysctl_stubs";
 const TIME_RES_FILE = `${STUB_DIR}/run/time_res`;
+const ADDR_INFO_FILE = `${STUB_DIR}/run/addr_info`;
  
 let profiles = {};
 let activeConfig = null;

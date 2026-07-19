@@ -2838,6 +2838,7 @@ function syncLatencyMonitorState() {
             stopLatencyPolling();
             const dot = document.getElementById('latency-status-dot');
             dot && dot.classList.remove('live');
+            renderNetworkInterfaceInfo('');
         }
     });
 }
@@ -2857,6 +2858,7 @@ function toggleLatencyMonitor() {
         stopLatencyPolling();
         const dot = document.getElementById('latency-status-dot');
         dot && dot.classList.remove('live');
+        renderNetworkInterfaceInfo('');
         execShell(`sh ${MODDIR}/proxy_control.sh stop_monitor_latency`, () => {
             showToast(t('toast_latency_stopped'), 'info');
         });
@@ -2876,24 +2878,76 @@ function stopLatencyPolling() {
     }
 }
 
+const _LATENCY_ADDR_SPLIT_MARKER = '___ADDR_INFO_SPLIT___';
+
 function pollLatency() {
-    execShell(`cat '${TIME_RES_FILE}' 2>/dev/null`, (output) => {
-        const dot = document.getElementById('latency-status-dot');
-        const raw = (output || '').trim();
-        const num = parseFloat(raw);
-        // service.sh writes seconds (curl's %{time_starttransfer}); empty/0/NaN means
-        // the probe timed out or never completed within curl's --max-time window.
-        const ms = (raw !== '' && !isNaN(num) && num > 0) ? Math.round(num * 1000) : null;
+    execShell(
+        `cat '${TIME_RES_FILE}' 2>/dev/null; echo '${_LATENCY_ADDR_SPLIT_MARKER}'; cat '${ADDR_INFO_FILE}' 2>/dev/null`,
+        (output) => {
+            const dot = document.getElementById('latency-status-dot');
+            const parts = (output || '').split(_LATENCY_ADDR_SPLIT_MARKER);
+            const raw = (parts[0] || '').trim();
+            const addrRaw = parts[1] || '';
+            const num = parseFloat(raw);
+            // service.sh writes seconds (curl's %{time_starttransfer}); empty/0/NaN means
+            // the probe timed out or never completed within curl's --max-time window.
+            const ms = (raw !== '' && !isNaN(num) && num > 0) ? Math.round(num * 1000) : null;
 
-        _latencySamples.push({ ms });
-        if (_latencySamples.length > LATENCY_MAX_SAMPLES) {
-            _latencySamples.shift();
+            _latencySamples.push({ ms });
+            if (_latencySamples.length > LATENCY_MAX_SAMPLES) {
+                _latencySamples.shift();
+            }
+
+            dot && dot.classList.add('live');
+            updateLatencyStats();
+            renderLatencyChart();
+            renderNetworkInterfaceInfo(addrRaw);
         }
+    );
+}
 
-        dot && dot.classList.add('live');
-        updateLatencyStats();
-        renderLatencyChart();
-    });
+// Parses the `ip addr show <iface>` style dump written to ADDR_INFO_FILE.
+// Picks the interface name from the "N: name: <FLAGS> ..." header line,
+// the first global-scope IPv4 (`inet`), and the first global-scope IPv6
+// (`inet6 ... scope global`, skipping link-local `scope link` addresses).
+function parseAddrInfo(raw) {
+    const lines = (raw || '').split('\n');
+    let iface = null;
+    let ipv4 = null;
+    let ipv6 = null;
+
+    for (const line of lines) {
+        const headerMatch = line.match(/^\d+:\s+([^:@]+)[:@]/);
+        if (headerMatch && !iface) {
+            iface = headerMatch[1].trim();
+            continue;
+        }
+        const t = line.trim();
+        if (!ipv4) {
+            const m4 = t.match(/^inet\s+([\d.]+)\/\d+/);
+            if (m4) ipv4 = m4[1];
+        }
+        if (!ipv6) {
+            const m6 = t.match(/^inet6\s+([0-9a-fA-F:]+)\/\d+\s+scope\s+global/);
+            if (m6) ipv6 = m6[1];
+        }
+    }
+
+    return { iface, ipv4, ipv6 };
+}
+
+function renderNetworkInterfaceInfo(raw) {
+    const ifaceEl = document.getElementById('latency-iface-value');
+    const ipv4El = document.getElementById('latency-ipv4-value');
+    const ipv6El = document.getElementById('latency-ipv6-value');
+    if (!ifaceEl && !ipv4El && !ipv6El) return;
+
+    const { iface, ipv4, ipv6 } = parseAddrInfo(raw);
+    const none = t('latency_net_none');
+
+    ifaceEl && (ifaceEl.textContent = iface || none);
+    ipv4El && (ipv4El.textContent = ipv4 || none);
+    ipv6El && (ipv6El.textContent = ipv6 || none);
 }
 
 function updateLatencyStats() {

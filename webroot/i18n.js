@@ -193,6 +193,10 @@ const i18n = {
         // Latency monitor tab
         tab_latency: "Network Latency",
         latency_enable_monitor: "Enable monitor",
+        latency_net_iface: "Interface",
+        latency_net_ipv4: "IPv4",
+        latency_net_ipv6: "IPv6",
+        latency_net_none: "Not connected",
         latency_stat_avg: "Avg",
         latency_stat_min: "Min",
         latency_stat_max: "Max",
@@ -434,6 +438,10 @@ const i18n = {
         // Latency monitor tab
         tab_latency: "网络延迟",
         latency_enable_monitor: "启用监控",
+        latency_net_iface: "网络接口",
+        latency_net_ipv4: "IPv4",
+        latency_net_ipv6: "IPv6",
+        latency_net_none: "未连接",
         latency_stat_avg: "平均",
         latency_stat_min: "最小",
         latency_stat_max: "最大",
@@ -675,6 +683,10 @@ const i18n = {
         // Latency monitor tab
         tab_latency: "網路延遲",
         latency_enable_monitor: "啟用監控",
+        latency_net_iface: "網路介面",
+        latency_net_ipv4: "IPv4",
+        latency_net_ipv6: "IPv6",
+        latency_net_none: "未連線",
         latency_stat_avg: "平均",
         latency_stat_min: "最小",
         latency_stat_max: "最大",
@@ -916,6 +928,10 @@ const i18n = {
         // Latency monitor tab
         tab_latency: "Độ Trễ Mạng",
         latency_enable_monitor: "Bật theo dõi",
+        latency_net_iface: "Giao diện mạng",
+        latency_net_ipv4: "IPv4",
+        latency_net_ipv6: "IPv6",
+        latency_net_none: "Chưa kết nối",
         latency_stat_avg: "TB",
         latency_stat_min: "Thấp nhất",
         latency_stat_max: "Cao nhất",
