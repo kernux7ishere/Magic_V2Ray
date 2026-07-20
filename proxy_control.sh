@@ -64,6 +64,11 @@ stop_monitor_latency() {
     echo "wait" > "$PIPE_FILE"
 }
 
+reset_mobile_network() {
+    echo "reset_mobile_network" > "$PIPE_FILE"
+    echo "wait" > "$PIPE_FILE"
+}
+
 case "$1" in
     start) start_proxy ;;
     stop) stop_proxy; rm -rf "$DATADIR/config.json" ;;
@@ -72,4 +77,5 @@ case "$1" in
     reapply) reapply ;;
     start_monitor_latency) start_monitor_latency;;
     stop_monitor_latency) stop_monitor_latency;;
+    reset_mobile_network) reset_mobile_network;;
 esac

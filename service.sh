@@ -140,16 +140,41 @@ apply_mark_rule() {
 }
 
 network_reset() {
-    echo "Reset the network"
-    $settings put global airplane_mode_on 1
-    $am broadcast -a android.intent.action.AIRPLANE_MODE --ez state true
-    sleep 3
-    $settings put global airplane_mode_on 0
-    $am broadcast -a android.intent.action.AIRPLANE_MODE --ez state false
+    echo "Reset the mobile network"
+    # Airplane mode kills all radios at once—Wi-Fi, Bluetooth, and cellular
+    # which breaks background services and active local networks. 
+    # Killing just the phone process targets only the mobile data stack cleanly
+    # without disrupting everything else.
+    # To be honest, we can use pkill -f com.android.phone here :>
+    # But it will kill any process with the name com.android.phone
+    for pid_dir in /proc/[0-9]*; do
+        [ -d "$pid_dir" ] || continue
+        uid=$(stat -c '%u' "$pid_dir" 2>/dev/null)
+        if [ "$uid" = "1001" ]; then
+            pid="${pid_dir##*/}"
+            if [ -f "$pid_dir/cmdline" ] && grep -q "com.android.phone" "$pid_dir/cmdline" 2>/dev/null; then
+                echo "Killing com.android.phone (PID: $pid, UID: $uid)"
+                kill -9 "$pid"
+            fi
+        fi
+    done
+}
+
+is_mobile_data_iface() {
+    local ifname="$1"
+    case "$ifname" in
+        rmnet*|ccmni*|pdp*|wwan*)
+            return 0 # Mobile network interface
+            ;;
+        *)
+            return 1
+            ;;
+    esac
 }
 
 check_ip_hunter() {
     local INET="$1"
+    is_mobile_data_iface "$INET" || return 0
     [ ! -f "$IP_HUNT_FILE" ] && return 0
     local RAW_PREFIX_LIST="$(cat "$IP_HUNT_FILE" | tr -d '\r')"
     local IFS=";"
@@ -449,6 +474,13 @@ do_job() {
         umount_proc_with_name "monitor_network_latency"
         MONITOR_PID=0
         rm -rf "$TIME_RES_FILE"
+        return 0
+    fi
+    if [ "$content" = "reset_mobile_network" ]; then
+        local cur_iface=$(get_active_interface)
+        if [ ! -z "$cur_iface" ]; then
+            check_ip_hunter "$cur_iface"
+        fi
         return 0
     fi
     return 1

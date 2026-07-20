@@ -2991,6 +2991,7 @@ function toggleIpHunter() {
 
     if (enabled) {
         saveIpHunterPrefixes();
+        toggleService('reset_mobile_network');
     } else {
         execShell(`rm -f '${IP_HUNT_FILE}'`, () => {
             showToast(t('toast_ip_hunter_disabled'), 'info');
