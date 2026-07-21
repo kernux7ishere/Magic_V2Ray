@@ -361,6 +361,8 @@ apply_routing_rules() {
     # Step 3: Create Mangle chain for local IPv6 output traffic
     $ip6tables -t mangle -N XRAY_MARK
     $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
+    $ip6tables -t mangle -A XRAY_MARK -p udp --dport 53 -j DROP
+    $ip6tables -t mangle -A XRAY_MARK -p tcp --dport 53 -j DROP
     $ip6tables -t mangle -A XRAY_MARK -d ::1/128 -j RETURN
     $ip6tables -t mangle -A XRAY_MARK -d fe80::/10 -j RETURN
     $ip6tables -t mangle -A XRAY_MARK -d fc00::/7 -j RETURN
@@ -374,8 +376,8 @@ apply_routing_rules() {
 
     # PREROUTING Mangle rules for incoming IPv6 hotspot traffic
     $ip6tables -t mangle -N HOTSPOT_PREROUTING
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p udp --dport 53 -j DROP
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p tcp --dport 53 -j DROP
     $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
     $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
     $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
