@@ -119,6 +119,8 @@ const i18n = {
         toast_check_ip: "Checking IP for ",
         menu_check_http: "Check HTTP",
         menu_check_ip: "Check IP",
+        menu_copy_payload: "Copy payload URI",
+        menu_copy_full_config: "Copy full config",
         toast_fetch_sub: "Fetching subscription for ",
 
         // Import dropdown
@@ -189,6 +191,11 @@ const i18n = {
         log_tail_lines: "Tail:",
         toast_log_copied: "Log copied to clipboard.",
         toast_log_copy_fail: "Failed to copy log.",
+        toast_node_payload_copied: "Payload URI copied to clipboard.",
+        toast_node_payload_copy_fail: "Failed to copy payload URI.",
+        toast_node_config_copied: "Full config copied to clipboard.",
+        toast_node_config_copy_fail: "Failed to copy full config.",
+        toast_node_config_gen_fail: "Failed to generate config for this node.",
         toast_log_cleared: "Log view cleared.",
         toast_xray_core_crash: "Xray core crashed. Please check the log for details and report to the developer.",
 
@@ -373,6 +380,8 @@ const i18n = {
         toast_check_ip: "正在检测 IP：",
         menu_check_http: "检测 HTTP",
         menu_check_ip: "检测 IP",
+        menu_copy_payload: "复制 Payload URI",
+        menu_copy_full_config: "复制完整配置",
         toast_fetch_sub: "正在拉取订阅：",
 
         // Import dropdown
@@ -443,6 +452,11 @@ const i18n = {
         log_tail_lines: "尾部行数：",
         toast_log_copied: "日志已复制到剪贴板。",
         toast_log_copy_fail: "复制日志失败。",
+        toast_node_payload_copied: "Payload URI 已复制到剪贴板。",
+        toast_node_payload_copy_fail: "复制 Payload URI 失败。",
+        toast_node_config_copied: "完整配置已复制到剪贴板。",
+        toast_node_config_copy_fail: "复制完整配置失败。",
+        toast_node_config_gen_fail: "生成该节点配置失败。",
         toast_log_cleared: "已清空日志视图。",
         toast_xray_core_crash: "Xray 内核已崩溃，请查看日志了解详情并反馈给开发者。",
 
@@ -627,6 +641,8 @@ const i18n = {
         toast_check_ip: "正在檢測 IP：",
         menu_check_http: "檢測 HTTP",
         menu_check_ip: "檢測 IP",
+        menu_copy_payload: "複製 Payload URI",
+        menu_copy_full_config: "複製完整設定",
         toast_fetch_sub: "正在拉取訂閱：",
 
         // Import dropdown
@@ -697,6 +713,11 @@ const i18n = {
         log_tail_lines: "尾端行數：",
         toast_log_copied: "日誌已複製到剪貼簿。",
         toast_log_copy_fail: "複製日誌失敗。",
+        toast_node_payload_copied: "Payload URI 已複製到剪貼簿。",
+        toast_node_payload_copy_fail: "複製 Payload URI 失敗。",
+        toast_node_config_copied: "完整設定已複製到剪貼簿。",
+        toast_node_config_copy_fail: "複製完整設定失敗。",
+        toast_node_config_gen_fail: "產生此節點的設定失敗。",
         toast_log_cleared: "已清空日誌畫面。",
         toast_xray_core_crash: "Xray 核心已當機，請查看日誌以了解詳情並回報給開發者。",
 
@@ -881,6 +902,8 @@ const i18n = {
         toast_check_ip: "Đang kiểm tra IP cho ",
         menu_check_http: "Check HTTP",
         menu_check_ip: "Check IP",
+        menu_copy_payload: "Sao chép URI payload",
+        menu_copy_full_config: "Sao chép cấu hình đầy đủ",
         toast_fetch_sub: "Đang lấy cấu hình cho ",
 
         // Import dropdown
@@ -951,6 +974,11 @@ const i18n = {
         log_tail_lines: "Dòng cuối:",
         toast_log_copied: "Đã sao chép log.",
         toast_log_copy_fail: "Sao chép log thất bại.",
+        toast_node_payload_copied: "Đã sao chép URI payload.",
+        toast_node_payload_copy_fail: "Sao chép URI payload thất bại.",
+        toast_node_config_copied: "Đã sao chép cấu hình đầy đủ.",
+        toast_node_config_copy_fail: "Sao chép cấu hình đầy đủ thất bại.",
+        toast_node_config_gen_fail: "Tạo cấu hình cho node này thất bại.",
         toast_log_cleared: "Đã xóa log khỏi màn hình.",
         toast_xray_core_crash: "Lõi Xray đã bị lỗi. Vui lòng kiểm tra nhật ký để biết chi tiết và báo cáo cho nhà phát triển.",
 

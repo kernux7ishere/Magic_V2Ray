@@ -682,6 +682,8 @@ function renderProfiles() {
                         <button class="btn-menu-trigger" onclick="toggleNodeMenu(event, this)" style="flex-shrink: 0;">⋮</button>
                         <div class="node-dropdown-menu">
                             <button onclick="${editAction}">${t('menu_edit')}</button>
+                            <button onclick="copyNodePayloadUrl(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_copy_payload')}</button>
+                            <button onclick="copyNodeFullConfig(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_copy_full_config')}</button>
                             <button class="btn-ping-category" onclick="checkSingleHttpWithClose(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_check_http')}</button>
                             <button class="btn-ping-category" onclick="checkSingleIpWithClose(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_check_ip')}</button>
                             <button class="btn-delete-item" onclick="deleteNode(event, '${escapeAttr(category)}', '${node.id}')">${t('menu_delete')}</button>
@@ -733,6 +735,47 @@ function deleteNode(event, category, id) {
     }
     saveProfiles();
     renderProfiles();
+}
+
+function copyNodePayloadUrl(event, category, id) {
+    event.stopPropagation();
+    closeAllMenus();
+    const node = profiles[category]?.nodes?.find(n => n.id === id);
+    if (!node) return;
+    navigator.clipboard.writeText(node.rawUri || '').then(() => {
+        showToast(t('toast_node_payload_copied'), 'success');
+    }).catch(() => {
+        showToast(t('toast_node_payload_copy_fail'), 'error');
+    });
+}
+
+function copyNodeFullConfig(event, category, id) {
+    event.stopPropagation();
+    closeAllMenus();
+    const node = profiles[category]?.nodes?.find(n => n.id === id);
+    if (!node) return;
+
+    let configStr;
+    try {
+        configStr = _resolveXrayConfig(node.rawUri);
+    } catch (e) {
+        showToast(t('toast_node_config_gen_fail'), 'error');
+        return;
+    }
+
+    try {
+        const parsed = JSON.parse(configStr);
+        if (parsed && parsed.error) {
+            showToast(t('toast_node_config_gen_fail'), 'error');
+            return;
+        }
+    } catch (e) { /* not JSON-parseable — fall through and copy as-is */ }
+
+    navigator.clipboard.writeText(configStr).then(() => {
+        showToast(t('toast_node_config_copied'), 'success');
+    }).catch(() => {
+        showToast(t('toast_node_config_copy_fail'), 'error');
+    });
 }
 
 function getFullNodeDetails(node) {
