@@ -67,23 +67,10 @@ get_status() {
     return 1
 }
 
-lock_sysctl() {
-    local value="$1"
-    local target_path="$2"
-    local filedir=$(dirname "$target_path")
-    local filename=$(basename "$target_path")
-    local stub_path="$STUB_DIR/$filedir"
-    local stub_file="$stub_path/$filename"
-    local current_val="$(cat "$target_path")" 
-
-    mkdir -p "$stub_path"
-    echo "$current_val" > "$stub_file"
-    echo "$value" > "$target_path"
-
-    chown $(stat -c '%u:%g' "$target_path") "$stub_file"
-    chcon $(stat -Z -c '%C' "$target_path") "$stub_file" # Just in case
-
-    mount -o bind "$stub_file" "$target_path"
+enable_forward() {
+    echo "1" > "/proc/sys/net/ipv4/ip_forward"
+    echo "1" > "/proc/sys/net/ipv6/conf/all/forwarding"
+    echo "1" > "/proc/sys/net/ipv6/conf/default/forwarding"
 }
 
 lock_xraytun0() {
@@ -237,6 +224,42 @@ monitor_network_latency() {
     rm -rf "$TIME_RES_FILE"
 }
 
+# ---------------------------------------------------------------------------
+# forward(): mirrors box-for-magisk's forward() helper. action is "-I" to add
+# or "-D" to remove. Kept as one function so apply/clear never drift apart.
+# ---------------------------------------------------------------------------
+forward() {
+    local action="$1"
+    $iptables "$action" FORWARD -i "$TUN_NAME" -j ACCEPT
+    $iptables "$action" FORWARD -o "$TUN_NAME" -j ACCEPT
+    $ip6tables "$action" FORWARD -i "$TUN_NAME" -j ACCEPT
+    $ip6tables "$action" FORWARD -o "$TUN_NAME" -j ACCEPT
+} >/dev/null 2>&1
+
+# ---------------------------------------------------------------------------
+# loosen_rp_filter(): fixes wifi hotspot breaking on some Samsung One UI
+# devices once xraytun0 becomes the default route.
+#
+# The kernel's effective reverse-path check is max(conf.all.rp_filter,
+# conf.<iface>.rp_filter) - our boot-time older lock_sysctl only locks "all" and
+# "default" to 0, but Samsung's netd sets the softAP interface's OWN
+# rp_filter value independently (often after the interface is already up),
+# so that per-interface value wins and hotspot client packets get dropped
+# for asymmetric routing. Loosen (not disable - 2, "loose mode") every
+# interface that already exists, and loosen "default" too so an AP
+# interface brought up later still inherits it.
+# ---------------------------------------------------------------------------
+loosen_rp_filter() {
+    sysctl -w net.ipv4.conf.all.rp_filter=2
+    sysctl -w net.ipv4.conf.default.rp_filter=2
+    for conf in /proc/sys/net/ipv4/conf/*/rp_filter; do
+        case "$conf" in
+            */lo/rp_filter|*/"$TUN_NAME"/rp_filter) continue ;;
+        esac
+        echo 2 > "$conf"
+    done
+}
+
 apply_routing_rules() {
     local retry=0
     local max_retry=10
@@ -248,8 +271,14 @@ apply_routing_rules() {
         retry=$((retry + 1))
     done
 
+    # Enable IP forward feature
+    enable_forward
+
     # Lock down xraytun0 interface
     lock_xraytun0
+
+    # Loosen rp_filter on the hotspot/AP interface (see loosen_rp_filter above)
+    loosen_rp_filter
 
     # =========================================================================
     # IPv4 CONFIGURATION
@@ -278,10 +307,9 @@ apply_routing_rules() {
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
     $iptables -t mangle -A OUTPUT -j XRAY_MARK
 
-    # Step 4: IPv4 Hotspot / Tethering Support
-    # Filter FORWARD rules
-    $iptables -I FORWARD -i $TUN_NAME -j ACCEPT
-    $iptables -I FORWARD -o $TUN_NAME -j ACCEPT
+    # Step 4: IPv4 + IPv6 Hotspot / Tethering Support
+    # Filter FORWARD rules (both address families, see forward() above)
+    forward -I
 
     # Force DNS redirection for tethered clients to Cloudflare DNS
     $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
@@ -343,9 +371,6 @@ apply_routing_rules() {
     $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
 
     # Step 4: IPv6 Hotspot / Tethering Support
-    # Filter FORWARD rules
-    $ip6tables -I FORWARD -i $TUN_NAME -j ACCEPT
-    $ip6tables -I FORWARD -o $TUN_NAME -j ACCEPT
 
     # PREROUTING Mangle rules for incoming IPv6 hotspot traffic
     $ip6tables -t mangle -N HOTSPOT_PREROUTING
@@ -385,8 +410,8 @@ clear_routing_rules() {
     $ip rule del pref 5050
     $ip rule del pref 6000
 
-    $iptables -D FORWARD -i $TUN_NAME -j ACCEPT
-    $iptables -D FORWARD -o $TUN_NAME -j ACCEPT
+    # Remove FORWARD ACCEPT rules for both address families (see forward() above)
+    forward -D
 
     $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
     $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
@@ -410,8 +435,6 @@ clear_routing_rules() {
     $ip -6 rule del fwmark 1 table 100 priority 1010
 
     # Delete hotspot rules
-    $ip6tables -D FORWARD -i $TUN_NAME -j ACCEPT
-    $ip6tables -D FORWARD -o $TUN_NAME -j ACCEPT
 
     $ip6tables -t mangle -D PREROUTING -j HOTSPOT_PREROUTING
     $ip6tables -t mangle -F HOTSPOT_PREROUTING
@@ -558,12 +581,6 @@ done
 while [ ! -f /data/misc/net/rt_tables ]; do
     sleep 1
 done
-lock_sysctl "1" "/proc/sys/net/ipv4/ip_forward"
-lock_sysctl "1" "/proc/sys/net/ipv6/conf/all/forwarding"
-lock_sysctl "1" "/proc/sys/net/ipv6/conf/default/forwarding"
-
-lock_sysctl "0" "/proc/sys/net/ipv4/conf/all/rp_filter"
-lock_sysctl "0" "/proc/sys/net/ipv4/conf/default/rp_filter"
 
 echo "start_monitor" > "$PIPE_FILE"
 
