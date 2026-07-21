@@ -15,6 +15,7 @@ let advSettings = {
     loglevel: "none",
     sniffing: true,
     routeOnly: false,
+    enableIPv6: false,
     preferIpv6: false,
     mux: false,
     mux_connections: 8,

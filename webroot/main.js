@@ -2035,6 +2035,7 @@ function bindSettingsToFormView() {
     document.getElementById('set-loglevel').value = advSettings.loglevel || "none";
     document.getElementById('set-sniffing').checked = advSettings.sniffing;
     document.getElementById('set-routeonly').checked = advSettings.routeOnly;
+    document.getElementById('set-enableipv6').checked = advSettings.enableIPv6;
     document.getElementById('set-preferipv6').checked = advSettings.preferIpv6;
     document.getElementById('set-dnsviaproxy').checked = advSettings.dnsViaProxy || true;
     document.getElementById('set-pinned-cert').value = advSettings.pinnedPeerCertSha256 || "";
@@ -2067,6 +2068,7 @@ function saveAdvancedSettingsForm(isLangOnly = false) {
     advSettings.loglevel = document.getElementById('set-loglevel').value;
     advSettings.sniffing = document.getElementById('set-sniffing').checked;
     advSettings.routeOnly = document.getElementById('set-routeonly').checked;
+    advSettings.enableIPv6 = document.getElementById('set-enableipv6').checked;
     advSettings.preferIpv6 = document.getElementById('set-preferipv6').checked;
     advSettings.dnsViaProxy = document.getElementById('set-dnsviaproxy').checked;
     advSettings.pinnedPeerCertSha256 = document.getElementById('set-pinned-cert').value.trim();
