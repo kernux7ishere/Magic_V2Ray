@@ -17,6 +17,15 @@ grep_prop() {
   cat $FILES 2>/dev/null | dos2unix | sed -n "$REGEX" | head -n 1
 }
 
+query_settings() {
+    local SETTINGS_FILE="$DATADIR/settings.base64"
+    [ ! -f "$SETTINGS_FILE" ] && return 1
+    local name="$1"
+    local val="$(base64 -d "$SETTINGS_FILE" | "$BINDIR/jq" -M "$name")"
+    echo "$val"
+    return 0
+}
+
 rm -rf "$DATADIR/xray.log"
 rm -rf "$DATADIR/tun2socks.log"
 XRAY_LOG="$DATADIR/xray.log"
@@ -69,8 +78,13 @@ get_status() {
 
 enable_forward() {
     echo "1" > "/proc/sys/net/ipv4/ip_forward"
-    echo "1" > "/proc/sys/net/ipv6/conf/all/forwarding"
-    echo "1" > "/proc/sys/net/ipv6/conf/default/forwarding"
+    if [ "$1" == "true" ]; then
+        echo "1" > "/proc/sys/net/ipv6/conf/all/forwarding"
+        echo "1" > "/proc/sys/net/ipv6/conf/default/forwarding"
+    else
+        echo "0" > "/proc/sys/net/ipv6/conf/all/forwarding"
+        echo "0" > "/proc/sys/net/ipv6/conf/default/forwarding"
+    fi
 }
 
 lock_xraytun0() {
@@ -270,9 +284,11 @@ apply_routing_rules() {
         sleep 0.5
         retry=$((retry + 1))
     done
+    ipv6_enabled="$(query_settings .enableIPv6)"
+    echo "IPv6 enabled: $ipv6_enabled"
 
     # Enable IP forward feature
-    enable_forward
+    enable_forward "$ipv6_enabled"
 
     # Lock down xraytun0 interface
     lock_xraytun0
@@ -351,41 +367,67 @@ apply_routing_rules() {
     # IPv6 CONFIGURATION
     # =========================================================================
 
-    # Step 1: Assign IPv6 address and default route
-    $ip -6 addr add fdfe:dcba:9876::1/64 dev $TUN_NAME
-    $ip -6 route replace default dev $TUN_NAME table 100
+    if [ "$ipv6_enabled" == true ]; then
+        # Step 1: Assign IPv6 address and default route
+        $ip -6 addr add fdfe:dcba:9876::1/64 dev $TUN_NAME
+        $ip -6 route replace default dev $TUN_NAME table 100
 
-    # Step 2: Routing Rule for marked IPv6 packets
-    $ip -6 rule add fwmark 1 table 100 priority 1010
+        # Step 2: Routing Rule for marked IPv6 packets
+        $ip -6 rule add fwmark 1 table 100 priority 1010
 
-    # Step 3: Create Mangle chain for local IPv6 output traffic
-    $ip6tables -t mangle -N XRAY_MARK
-    $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
-    $ip6tables -t mangle -A XRAY_MARK -p udp --dport 53 -j DROP
-    $ip6tables -t mangle -A XRAY_MARK -p tcp --dport 53 -j DROP
-    $ip6tables -t mangle -A XRAY_MARK -d ::1/128 -j RETURN
-    $ip6tables -t mangle -A XRAY_MARK -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -A XRAY_MARK -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -A XRAY_MARK -d ff00::/8 -j RETURN
-    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
+        # Step 3: Create Mangle chain for local IPv6 output traffic
+        $ip6tables -t mangle -N XRAY_MARK
+        $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
+        $ip6tables -t mangle -A XRAY_MARK -p udp --dport 53 -j DROP
+        $ip6tables -t mangle -A XRAY_MARK -p tcp --dport 53 -j DROP
+        $ip6tables -t mangle -A XRAY_MARK -d ::1/128 -j RETURN
+        $ip6tables -t mangle -A XRAY_MARK -d fe80::/10 -j RETURN
+        $ip6tables -t mangle -A XRAY_MARK -d fc00::/7 -j RETURN
+        $ip6tables -t mangle -A XRAY_MARK -d ff00::/8 -j RETURN
+        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+        $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
 
-    # Step 4: IPv6 Hotspot / Tethering Support
+        # Step 4: IPv6 Hotspot / Tethering Support
 
-    # PREROUTING Mangle rules for incoming IPv6 hotspot traffic
-    $ip6tables -t mangle -N HOTSPOT_PREROUTING
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p udp --dport 53 -j DROP
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p tcp --dport 53 -j DROP
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
-    $ip6tables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
+        # PREROUTING Mangle rules for incoming IPv6 hotspot traffic
+        $ip6tables -t mangle -N HOTSPOT_PREROUTING
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING -p udp --dport 53 -j DROP
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING -p tcp --dport 53 -j DROP
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
+        $ip6tables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
 
-    # Clamp IPv6 TCP MSS
-    $ip6tables -t mangle -I FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1330
+        # Step 5: Hotspot Forwarding (Clamp IPv6 TCP MSS)
+        $ip6tables -t mangle -N HOTSPOT_FORWARD
+        $ip6tables -t mangle -A HOTSPOT_FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1330
+        $ip6tables -t mangle -I FORWARD 1 -j HOTSPOT_FORWARD
+    else
+        # Step 1: Disable IPv6 at system level and block via routing rule
+        $ip -6 rule add unreachable priority 1010
+
+        # Step 2: Create Mangle chain for local IPv6 output traffic (Drop all IPv6)
+        $ip6tables -t mangle -N XRAY_MARK
+        # Allow core proxy socket bypass if fwmark is already present
+        $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
+        # Drop all outgoing IPv6 traffic from local applications
+        $ip6tables -t mangle -A XRAY_MARK -j DROP
+        $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
+
+        # Step 3: Create Mangle chain for IPv6 Hotspot/Tethering traffic (Drop all IPv6)
+        $ip6tables -t mangle -N HOTSPOT_PREROUTING
+        # Drop all incoming IPv6 traffic from connected hotspot clients
+        $ip6tables -t mangle -A HOTSPOT_PREROUTING -j DROP
+        $ip6tables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
+
+        # Step 4: Reject all forwarded IPv6 traffic for Hotspot clients
+        $ip6tables -t filter -N HOTSPOT_FORWARD
+        $ip6tables -t filter -A HOTSPOT_FORWARD -j REJECT --reject-with icmp6-no-route
+        $ip6tables -t filter -I FORWARD 1 -j HOTSPOT_FORWARD
+    fi
 }
 
 clear_routing_rules() {
@@ -434,7 +476,7 @@ clear_routing_rules() {
     $ip6tables -t mangle -D OUTPUT -j XRAY_MARK
     $ip6tables -t mangle -F XRAY_MARK
     $ip6tables -t mangle -X XRAY_MARK
-    $ip -6 rule del fwmark 1 table 100 priority 1010
+    $ip -6 rule del priority 1010
 
     # Delete hotspot rules
 
@@ -442,7 +484,13 @@ clear_routing_rules() {
     $ip6tables -t mangle -F HOTSPOT_PREROUTING
     $ip6tables -t mangle -X HOTSPOT_PREROUTING
 
-    $ip6tables -t mangle -D FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1330
+    $ip6tables -t mangle -D FORWARD -j HOTSPOT_FORWARD
+    $ip6tables -t mangle -F HOTSPOT_FORWARD
+    $ip6tables -t mangle -X HOTSPOT_FORWARD
+
+    $ip6tables -t filter -D FORWARD -j HOTSPOT_FORWARD
+    $ip6tables -t filter -F HOTSPOT_FORWARD
+    $ip6tables -t filter -X HOTSPOT_FORWARD
 
     # Down the TUN device
     $ip link set dev $TUN_NAME down
