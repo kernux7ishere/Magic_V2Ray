@@ -248,18 +248,22 @@ apply_routing_rules() {
         retry=$((retry + 1))
     done
 
-    # Capture all traffic to tun device and redirect to xray core
-    # Lock down xraytun
+    # Lock down xraytun0 interface
     lock_xraytun0
 
-    # IPV4
-    # STEP 1: Create tun device and assign IP address
+    # =========================================================================
+    # IPv4 CONFIGURATION
+    # =========================================================================
+    
+    # Step 1: Assign IP address and set TUN device UP
     $ip addr add 198.18.0.1/15 dev $TUN_NAME
     $ip link set dev $TUN_NAME up
     $ip route replace default dev $TUN_NAME table 100
-    # STEP 2: Add routing rule to route marked packets through the tun device
+
+    # Step 2: Routing Rule for marked packets
     $ip rule add fwmark 1 table 100 priority 1010
-    # STEP 3: Add iptables rules to mark packets from tun2socks and route them through the tun device
+
+    # Step 3: Create Mangle chain for local output traffic
     $iptables -t mangle -N XRAY_MARK
     $iptables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
     $iptables -t mangle -A XRAY_MARK -d 127.0.0.0/8 -j RETURN
@@ -272,39 +276,61 @@ apply_routing_rules() {
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
-    $iptables -t mangle -A OUTPUT -j XRAY_MARK 
-    # IPv4 Hotspot support
-    # STEP 1: Allow forward traffic between hotspot interfaces and $TUN_NAME
-    $iptables -I FORWARD -o $TUN_NAME -j ACCEPT
+    $iptables -t mangle -A OUTPUT -j XRAY_MARK
+
+    # Step 4: IPv4 Hotspot / Tethering Support
+    # Filter FORWARD rules
     $iptables -I FORWARD -i $TUN_NAME -j ACCEPT
-    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -I PREROUTING -t nat ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    # STEP 2: Force hotspot private IP ranges to lookup table 100
+    $iptables -I FORWARD -o $TUN_NAME -j ACCEPT
+
+    # Force DNS redirection for tethered clients to Cloudflare DNS
+    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+
+    # PREROUTING Mangle rules for incoming hotspot traffic
+    $iptables -t mangle -N HOTSPOT_PREROUTING
+    $iptables -t mangle -A HOTSPOT_PREROUTING -d 10.0.0.0/8 -j RETURN
+    $iptables -t mangle -A HOTSPOT_PREROUTING -d 172.16.0.0/12 -j RETURN
+    $iptables -t mangle -A HOTSPOT_PREROUTING -d 192.168.0.0/16 -j RETURN
+    $iptables -t mangle -A HOTSPOT_PREROUTING -d 127.0.0.0/8 -j RETURN
+    $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p tcp -j MARK --set-xmark 1
+    $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p udp -j MARK --set-xmark 1
+    $iptables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
+
+    # IP Routing rules for tethering private subnets
     $ip rule add iif lo goto 6000 pref 5000
     $ip rule add iif $TUN_NAME lookup main suppress_prefixlength 0 pref 5010
     $ip rule add iif $TUN_NAME goto 6000 pref 5020
-    # * Bypass LAN
+    # Bypass LAN
     $ip rule add to 10.0.0.0/8 lookup main pref 5025
     $ip rule add to 172.16.0.0/12 lookup main pref 5026
     $ip rule add to 192.168.0.0/16 lookup main pref 5027
-    # * Redirect to $TUN_NAME
+    # Redirect Hotspot to table 100
     $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
     $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
     $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
     $ip rule add nop pref 6000
-    # STEP 3: Adjust TCPMSS to prevent TLS packet fragmentation overhead
+
+    # Clamp TCP MSS to prevent fragmentation issues over VPN/TUN
     $iptables -t mangle -I FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
-    # Hide proxy from apps
+
+    # Hide proxy port from non-system apps
     $iptables -I OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
 
-    # IPV6
-    # STEP 1: Create tun device and assign IP address
+
+    # =========================================================================
+    # IPv6 CONFIGURATION
+    # =========================================================================
+
+    # Step 1: Assign IPv6 address and default route
     $ip -6 addr add fdfe:dcba:9876::1/64 dev $TUN_NAME
     $ip -6 route replace default dev $TUN_NAME table 100
-    # STEP 2: Add routing rule to route marked packets through the tun device
+
+    # Step 2: Routing Rule for marked IPv6 packets
     $ip -6 rule add fwmark 1 table 100 priority 1010
-    # STEP 3: Add ip6tables rules to mark packets from tun2socks and route them through the tun device
+
+    # Step 3: Create Mangle chain for local IPv6 output traffic
     $ip6tables -t mangle -N XRAY_MARK
     $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
     $ip6tables -t mangle -A XRAY_MARK -d ::1/128 -j RETURN
@@ -315,25 +341,39 @@ apply_routing_rules() {
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
     $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
     $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
-    # IPv6 Hotspot support
+
+    # Step 4: IPv6 Hotspot / Tethering Support
+    # Filter FORWARD rules
     $ip6tables -I FORWARD -i $TUN_NAME -j ACCEPT
     $ip6tables -I FORWARD -o $TUN_NAME -j ACCEPT
-    $ip6tables -t mangle -I PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -I PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -A PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
+
+    # PREROUTING Mangle rules for incoming IPv6 hotspot traffic
+    $ip6tables -t mangle -N HOTSPOT_PREROUTING
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
+    $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
+    $ip6tables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
+
+    # Clamp IPv6 TCP MSS
+    $ip6tables -t mangle -I FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1330
 }
 
 clear_routing_rules() {
-    # IPv4
+    # =========================================================================
+    # CLEAR IPv4 RULES
+    # =========================================================================
+    
+    # Delete local mangle output rules
     $iptables -t mangle -D OUTPUT -j XRAY_MARK
     $iptables -t mangle -F XRAY_MARK
     $iptables -t mangle -X XRAY_MARK
     $ip rule del fwmark 1 table 100 priority 1010
     $iptables -D OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
-    # IPv4 hotspot
+
+    # Delete hotspot rules & ip rules
     $ip rule del pref 5000
     $ip rule del pref 5010
     $ip rule del pref 5020
@@ -344,28 +384,42 @@ clear_routing_rules() {
     $ip rule del pref 5040
     $ip rule del pref 5050
     $ip rule del pref 6000
-    $iptables -D FORWARD -o $TUN_NAME -j ACCEPT
+
     $iptables -D FORWARD -i $TUN_NAME -j ACCEPT
+    $iptables -D FORWARD -o $TUN_NAME -j ACCEPT
+
     $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
     $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
     $iptables -D PREROUTING -t nat ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+
+    $iptables -t mangle -D PREROUTING -j HOTSPOT_PREROUTING
+    $iptables -t mangle -F HOTSPOT_PREROUTING
+    $iptables -t mangle -X HOTSPOT_PREROUTING
+
     $iptables -t mangle -D FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1350
-    # IPv6
+
+
+    # =========================================================================
+    # CLEAR IPv6 RULES
+    # =========================================================================
+    
+    # Delete local mangle output rules
     $ip6tables -t mangle -D OUTPUT -j XRAY_MARK
     $ip6tables -t mangle -F XRAY_MARK
     $ip6tables -t mangle -X XRAY_MARK
     $ip -6 rule del fwmark 1 table 100 priority 1010
-    # IPv6 hotspot
+
+    # Delete hotspot rules
     $ip6tables -D FORWARD -i $TUN_NAME -j ACCEPT
     $ip6tables -D FORWARD -o $TUN_NAME -j ACCEPT
-    $ip6tables -t mangle -D PREROUTING -p udp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -D PREROUTING -p tcp --dport 53 -j MARK --set-xmark 1
-    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
-    $ip6tables -t mangle -D PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
 
-    # Down the tun device
+    $ip6tables -t mangle -D PREROUTING -j HOTSPOT_PREROUTING
+    $ip6tables -t mangle -F HOTSPOT_PREROUTING
+    $ip6tables -t mangle -X HOTSPOT_PREROUTING
+
+    $ip6tables -t mangle -D FORWARD -o $TUN_NAME -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1330
+
+    # Down the TUN device
     $ip link set dev $TUN_NAME down
 }
 
