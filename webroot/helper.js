@@ -332,7 +332,8 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                         fingerprint: p.get('fp') || "chrome",
                         publicKey: p.get('pbk') || "",
                         shortId: p.get('sid') || "",
-                        spiderX: p.get('spx') || ""
+                        spiderX: p.get('spx') || "",
+                        ...(p.get('pqv') ? { mldsa65Verify: p.get('pqv') } : {})
                     };
                 } else {
                     outbound.streamSettings.tlsSettings = {
@@ -469,7 +470,8 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                                 fingerprint: ssParams.get('fp') || "chrome",
                                 publicKey: ssParams.get('pbk') || "",
                                 shortId: ssParams.get('sid') || "",
-                                spiderX: ssParams.get('spx') || ""
+                                spiderX: ssParams.get('spx') || "",
+                                ...(ssParams.get('pqv') ? { mldsa65Verify: ssParams.get('pqv') } : {})
                             };
                         } else {
                             outbound.streamSettings.tlsSettings = {
@@ -1013,6 +1015,7 @@ function convert_outbound_to_uri(outbound) {
                 if (r.publicKey)   q.pbk = r.publicKey;
                 if (r.shortId)     q.sid = r.shortId;
                 if (r.spiderX)     q.spx = r.spiderX;
+                if (r.mldsa65Verify) q.pqv = r.mldsa65Verify;
             }
 
             if (net === 'ws') {
@@ -1102,6 +1105,7 @@ function convert_outbound_to_uri(outbound) {
                 if (r.publicKey)   q.pbk = r.publicKey;
                 if (r.shortId)     q.sid = r.shortId;
                 if (r.spiderX)     q.spx = r.spiderX;
+                if (r.mldsa65Verify) q.pqv = r.mldsa65Verify;
             }
 
             if (net === 'ws') {

@@ -68,6 +68,8 @@ const i18n = {
         lbl_alpn: "ALPN",
         lbl_pbk: "Public Key (Reality)",
         lbl_sid: "Short ID (Reality)",
+        lbl_spx: "SpiderX (Reality)",
+        lbl_pqv: "Post-Quantum Verify (pqv)",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -320,6 +322,8 @@ const i18n = {
         lbl_alpn: "ALPN",
         lbl_pbk: "公钥（Reality）",
         lbl_sid: "Short ID（Reality）",
+        lbl_spx: "SpiderX（Reality）",
+        lbl_pqv: "抗量子验证（pqv）",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -572,6 +576,8 @@ const i18n = {
         lbl_alpn: "ALPN",
         lbl_pbk: "公鑰（Reality）",
         lbl_sid: "Short ID（Reality）",
+        lbl_spx: "SpiderX（Reality）",
+        lbl_pqv: "抗量子驗證（pqv）",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -824,6 +830,8 @@ const i18n = {
         lbl_alpn: "Giao thức ALPN",
         lbl_pbk: "Khóa công khai (Public Key)",
         lbl_sid: "Mã định danh ngắn (Short ID)",
+        lbl_spx: "SpiderX (Reality)",
+        lbl_pqv: "Xác minh hậu lượng tử (pqv)",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",

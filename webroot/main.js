@@ -779,6 +779,8 @@ function getFullNodeDetails(node) {
         alpn: "",
         publicKey: "",
         shortId: "",
+        spiderX: "",
+        pqv: "",
         alterId: "0",
         headerType: "none",
         // WireGuard
@@ -897,6 +899,8 @@ function getFullNodeDetails(node) {
             if (d.security === 'reality') {
                 d.publicKey = p.get('pbk') || '';
                 d.shortId = p.get('sid') || '';
+                d.spiderX = p.get('spx') || '';
+                d.pqv = p.get('pqv') || '';
             }
         } catch (e) { console.error("Error parsing standard URL mapping", e); }
     }
@@ -980,6 +984,8 @@ function getFullNodeDetails(node) {
                     if (d.security === 'reality') {
                         d.publicKey = p.get('pbk') || '';
                         d.shortId = p.get('sid') || '';
+                        d.spiderX = p.get('spx') || '';
+                        d.pqv = p.get('pqv') || '';
                     }
                 } else {
                     const pluginStr = p.get('plugin');
@@ -1110,6 +1116,8 @@ function serializeNodeDetailsToUri(d, protocol) {
         if (d.security === 'reality') {
             if (d.publicKey) params.set('pbk', d.publicKey);
             if (d.shortId) params.set('sid', d.shortId);
+            if (d.spiderX) params.set('spx', d.spiderX);
+            if (d.pqv) params.set('pqv', d.pqv);
         }
         let pStr = params.toString();
         if (pStr) urlStr += "?" + pStr;
@@ -1253,6 +1261,8 @@ function serializeNodeDetailsToUri(d, protocol) {
         if (d.security === 'reality') {
             if (d.publicKey) params.set('pbk', d.publicKey);
             if (d.shortId) params.set('sid', d.shortId);
+            if (d.spiderX) params.set('spx', d.spiderX);
+            if (d.pqv) params.set('pqv', d.pqv);
         }
         let pStr = params.toString();
         if (pStr) urlStr += "?" + pStr;
@@ -1303,7 +1313,7 @@ function _populateEditModal(node, isNew = false) {
         httpupgradeHost: "", httpupgradePath: "/", xhttpMode: "auto", xhttpHost: "",
         xhttpPath: "/", xhttpExtra: "", h2Host: "", h2Path: "/", grpcMode: "gun",
         grpcAuth: "", grpcServiceName: "", security: node.security || "none", sni: "",
-        fingerprint: "chrome", alpn: "", publicKey: "", shortId: "", alterId: "0",
+        fingerprint: "chrome", alpn: "", publicKey: "", shortId: "", spiderX: "", pqv: "", alterId: "0",
         headerType: "none", wgSecretKey: "", wgPublicKey: "", wgPresharedKey: "",
         wgReserved: "", wgLocalAddress: "172.16.0.2/32", hy2ObfsPassword: "",
         hy2PortHopping: "", hy2HopInterval: "", hy2BandwidthDown: "", hy2BandwidthUp: "",
@@ -1354,6 +1364,8 @@ function _populateEditModal(node, isNew = false) {
     document.getElementById('edit-alpn').value = d.alpn;
     document.getElementById('edit-pbk').value = d.publicKey;
     document.getElementById('edit-sid').value = d.shortId;
+    document.getElementById('edit-spx').value = d.spiderX || '';
+    document.getElementById('edit-pqv').value = d.pqv || '';
     document.getElementById('edit-alterid').value = d.alterId;
     // WireGuard
     document.getElementById('edit-wg-secret-key').value = d.wgSecretKey;
@@ -1505,6 +1517,8 @@ function _collectEditFormData() {
         alpn: document.getElementById('edit-alpn').value.trim(),
         publicKey: document.getElementById('edit-pbk').value.trim(),
         shortId: document.getElementById('edit-sid').value.trim(),
+        spiderX: document.getElementById('edit-spx').value.trim(),
+        pqv: document.getElementById('edit-pqv').value.trim(),
         alterId: document.getElementById('edit-alterid').value.trim() || "0",
         headerType: document.getElementById('edit-header-type').value,
         // WireGuard
