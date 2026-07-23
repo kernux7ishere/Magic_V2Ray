@@ -362,6 +362,18 @@ apply_routing_rules() {
     # Hide proxy port from non-system apps
     $iptables -I OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
 
+    # Step 5: Fake ICMP replies (hev-socks5-tunnel does not proxy ICMP, so
+    # redirect outgoing pings to the loopback instead of leaking them
+    # through the real interface / letting them time out on the TUN device)
+    $iptables -t nat -N XRAY_FAKE_ICMP
+    $iptables -t nat -A XRAY_FAKE_ICMP -d 127.0.0.0/8 -j RETURN
+    $iptables -t nat -A XRAY_FAKE_ICMP -d 10.0.0.0/8 -j RETURN
+    $iptables -t nat -A XRAY_FAKE_ICMP -d 172.16.0.0/12 -j RETURN
+    $iptables -t nat -A XRAY_FAKE_ICMP -d 192.168.0.0/16 -j RETURN
+    $iptables -t nat -A XRAY_FAKE_ICMP -p icmp -j DNAT --to-destination 127.0.0.1
+    $iptables -t nat -I OUTPUT -p icmp -j XRAY_FAKE_ICMP
+    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -p icmp -j XRAY_FAKE_ICMP
+
 
     # =========================================================================
     # IPv6 CONFIGURATION
@@ -441,6 +453,12 @@ clear_routing_rules() {
     $iptables -t mangle -X XRAY_MARK
     $ip rule del fwmark 1 table 100 priority 1010
     $iptables -D OUTPUT -p tcp --dport $TUN_PORT -d $TUN_ADDR -m owner --uid-owner 9999-2147483647 -j REJECT --reject-with tcp-reset
+
+    # Delete fake ICMP chain
+    $iptables -t nat -D OUTPUT -p icmp -j XRAY_FAKE_ICMP
+    $iptables -t nat -D PREROUTING -p icmp -j XRAY_FAKE_ICMP
+    $iptables -t nat -F XRAY_FAKE_ICMP
+    $iptables -t nat -X XRAY_FAKE_ICMP
 
     # Delete hotspot rules & ip rules
     $ip rule del pref 5000
