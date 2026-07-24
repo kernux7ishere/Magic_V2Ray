@@ -761,6 +761,13 @@
                 <div class="chain-info-box" data-i18n="import_rules_desc">
                     Paste a routing rule preset JSON array below. Unlocked rules will be replaced; locked rules are kept.
                 </div>
+                <div class="edit-item-field">
+                    <label data-i18n="lbl_rules_import_url">Import from URL</label>
+                    <div style="display: flex; gap: 8px;">
+                        <input type="text" id="import-routing-url" data-i18n-placeholder="import_rules_url_placeholder" placeholder="https://example.com/rules.json" style="flex: 1;">
+                        <button class="modal-icon-btn" onclick="fetchRoutingPresetFromUrl()" data-i18n="btn_fetch" style="width: auto; padding: 0 14px;">Fetch</button>
+                    </div>
+                </div>
                 <textarea id="import-routing-textarea" data-i18n-placeholder="import_rules_placeholder" placeholder='[{"remarks":"...","domain":["geosite:google"],"outboundTag":"proxy"}]' style="height: 240px;"></textarea>
             </div>
         </div>

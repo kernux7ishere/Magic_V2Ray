@@ -2330,11 +2330,51 @@ function _rtToCsv(v) {
 
 function openImportRoutingModal() {
     document.getElementById('import-routing-textarea').value = '';
+    const urlInput = document.getElementById('import-routing-url');
+    if (urlInput) urlInput.value = '';
     document.getElementById('import-routing-modal').style.display = 'block';
 }
 
 function closeImportRoutingModal() {
     document.getElementById('import-routing-modal').style.display = 'none';
+}
+
+// Fetches a routing preset JSON array from a URL (same curl path used for
+// subscriptions, including the local SOCKS5 hop when the proxy is running so
+// the fetch itself doesn't leak outside the tunnel) and drops the raw result
+// into the textarea for review before the user confirms the import.
+async function fetchRoutingPresetFromUrl() {
+    const urlInput = document.getElementById('import-routing-url');
+    const url = (urlInput?.value || '').trim();
+    if (!url) return showToast(t('toast_empty_import'), 'error');
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return showToast(t('toast_invalid_sub'), 'error');
+    }
+
+    const status = await execShellAsync(`sh ${MODDIR}/proxy_control.sh status`);
+    const escapedUrl = url.replace(/'/g, "'\\''");
+    const extraArgs = (status === 'running') ? "--socks5-hostname 127.17.1.3:808" : "";
+
+    showLoading('toast_fetch_sub');
+    execShell(`${MODDIR}/bin/curl ${extraArgs} -sLk --max-time 15 '${escapedUrl}'`, (res) => {
+        hideLoading();
+        if (!res || res.trim() === "") {
+            return showToast(t('toast_fetch_failed'), 'error');
+        }
+        if (res.includes("Failed to connect") || res.includes("Could not resolve")) {
+            return showToast(t('toast_fetch_reason') + res.split('\n')[0], 'error');
+        }
+
+        try {
+            const parsed = JSON.parse(res.trim());
+            if (!Array.isArray(parsed)) throw new Error('not an array');
+            document.getElementById('import-routing-textarea').value = JSON.stringify(parsed, null, 2);
+            showToast(t('toast_rules_fetch_ok'), 'success');
+        } catch (e) {
+            showToast(t('toast_rules_import_invalid'), 'error');
+        }
+    });
 }
 
 function importRoutingRulesFromJson() {
