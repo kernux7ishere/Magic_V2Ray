@@ -51,6 +51,8 @@ const i18n = {
         network_mode_wifi: "WiFi / Ethernet Only",
         network_mode_mobile: "Mobile Data Only",
         lbl_mtu: "Maximum Transmission Unit (MTU)",
+        lbl_allowtether: "Allow Tether from Proxy",
+        desc_allowtether: "Route tethered/hotspot clients through the proxy. Disable to let them bypass the proxy and use the direct connection.",
         btn_save_settings: "Save & Apply Configurations",
         menu_edit: "Edit Config",
 
@@ -326,6 +328,8 @@ const i18n = {
         network_mode_wifi: "仅WiFi/以太网",
         network_mode_mobile: "仅移动数据",
         lbl_mtu: "最大传输单元（MTU）",
+        lbl_allowtether: "允许热点/网络共享走代理",
+        desc_allowtether: "让热点/网络共享的客户端流量经代理转发。关闭后，这些客户端将绕过代理，直接联网。",
         btn_save_settings: "保存并应用配置",
         menu_edit: "编辑配置",
 
@@ -601,6 +605,8 @@ const i18n = {
         network_mode_wifi: "僅WiFi/乙太網路",
         network_mode_mobile: "僅行動數據",
         lbl_mtu: "最大傳輸單元（MTU）",
+        lbl_allowtether: "允許熱點/網路共用走代理",
+        desc_allowtether: "讓熱點/網路共用的客戶端流量經代理轉發。關閉後，這些客戶端將略過代理，直接連上網路。",
         btn_save_settings: "儲存並套用設定",
         menu_edit: "編輯設定",
 
@@ -876,6 +882,8 @@ const i18n = {
         network_mode_wifi: "Chỉ WiFi / Ethernet",
         network_mode_mobile: "Chỉ Dữ Liệu Di Động",
         lbl_mtu: "Kích Thước Gói Tối Đa (MTU)",
+        lbl_allowtether: "Chia sẻ mạng Proxy",
+        desc_allowtether: "Định tuyến thiết bị dùng chia sẻ mạng/hotspot qua proxy. Tắt để các thiết bị này bỏ qua proxy và dùng kết nối trực tiếp.",
         btn_save_settings: "Lưu & Áp Dụng Cấu Hình",
 
         // Configuration settings

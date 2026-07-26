@@ -2094,6 +2094,7 @@ function bindSettingsToFormView() {
 
     document.getElementById('set-mtu').value = advSettings.mtu || 1350;
     document.getElementById('set-networkmode').value = advSettings.networkMode ?? 0;
+    document.getElementById('set-allowtether').checked = advSettings.allowTether !== false;
 
     if (!Array.isArray(advSettings.routingRules)) advSettings.routingRules = [];
     renderRoutingRules();
@@ -2125,6 +2126,7 @@ function saveAdvancedSettingsForm(isLangOnly = false) {
 
     advSettings.mtu = parseInt(document.getElementById('set-mtu').value) || 1350;
     advSettings.networkMode = parseInt(document.getElementById('set-networkmode').value) || 0;
+    advSettings.allowTether = document.getElementById('set-allowtether').checked;
 
     advSettings.lang = currentLang;
 

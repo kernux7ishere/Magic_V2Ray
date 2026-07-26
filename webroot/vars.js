@@ -18,6 +18,7 @@ let advSettings = {
     enableIPv6: false,
     preferIpv6: false,
     networkMode: 0,
+    allowTether: true,
     mux: false,
     mux_connections: 8,
     fragment: false,

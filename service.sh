@@ -291,6 +291,10 @@ apply_routing_rules() {
     [ -z "$network_mode" ] && network_mode=0
     echo "Network mode: $network_mode"
 
+    allow_tether="$(query_settings .allowTether)"
+    [ "$allow_tether" = "false" ] && allow_tether=false || allow_tether=true
+    echo "Allow tether from proxy: $allow_tether"
+
     # Enable IP forward feature
     enable_forward "$ipv6_enabled"
 
@@ -357,19 +361,26 @@ apply_routing_rules() {
     # Filter FORWARD rules (both address families, see forward() above)
     forward -I
 
-    # Force DNS redirection for tethered clients to Cloudflare DNS
-    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
-    $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
-
     # PREROUTING Mangle rules for incoming hotspot traffic
     $iptables -t mangle -N HOTSPOT_PREROUTING
     $iptables -t mangle -A HOTSPOT_PREROUTING -d 10.0.0.0/8 -j RETURN
     $iptables -t mangle -A HOTSPOT_PREROUTING -d 172.16.0.0/12 -j RETURN
     $iptables -t mangle -A HOTSPOT_PREROUTING -d 192.168.0.0/16 -j RETURN
     $iptables -t mangle -A HOTSPOT_PREROUTING -d 127.0.0.0/8 -j RETURN
-    $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p tcp -j MARK --set-xmark 1
-    $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p udp -j MARK --set-xmark 1
+
+    # allowTether (see query_settings .allowTether, default true):
+    #   true  = tethered/hotspot clients are marked and routed through the proxy
+    #   false = tethered/hotspot clients bypass the proxy entirely and use the
+    #           device's normal/direct route (chain still exists but only RETURNs)
+    if [ "$allow_tether" = true ]; then
+        # Force DNS redirection for tethered clients to Cloudflare DNS
+        $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 10.0.0.0/8 -p udp --dport 53 -j DNAT --to 1.1.1.1
+        $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 172.16.0.0/12 -p udp --dport 53 -j DNAT --to 1.1.1.1
+        $iptables -t nat -I PREROUTING ! -i $TUN_NAME -d 192.168.0.0/16 -p udp --dport 53 -j DNAT --to 1.1.1.1
+
+        $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p tcp -j MARK --set-xmark 1
+        $iptables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -p udp -j MARK --set-xmark 1
+    fi
     $iptables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
 
     # IP Routing rules for tethering private subnets
@@ -380,10 +391,12 @@ apply_routing_rules() {
     $ip rule add to 10.0.0.0/8 lookup main pref 5025
     $ip rule add to 172.16.0.0/12 lookup main pref 5026
     $ip rule add to 192.168.0.0/16 lookup main pref 5027
-    # Redirect Hotspot to table 100
-    $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
-    $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
-    $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
+    if [ "$allow_tether" = true ]; then
+        # Redirect Hotspot to table 100 (proxy)
+        $ip rule add from 10.0.0.0/8 lookup 100 pref 5030
+        $ip rule add from 172.16.0.0/12 lookup 100 pref 5040
+        $ip rule add from 192.168.0.0/16 lookup 100 pref 5050
+    fi
     $ip rule add nop pref 6000
 
     # Clamp TCP MSS to prevent fragmentation issues over VPN/TUN
@@ -460,7 +473,12 @@ apply_routing_rules() {
         $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d ::1/128 -j RETURN
         $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fe80::/10 -j RETURN
         $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -d fc00::/7 -j RETURN
-        $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
+        # allowTether (see query_settings .allowTether, default true): only mark
+        # tethered/hotspot IPv6 traffic for the proxy when tethering is allowed
+        # to use it; otherwise let it RETURN and use the normal direct route.
+        if [ "$allow_tether" = true ]; then
+            $ip6tables -t mangle -A HOTSPOT_PREROUTING ! -i $TUN_NAME -j MARK --set-xmark 1
+        fi
         $ip6tables -t mangle -I PREROUTING 1 -j HOTSPOT_PREROUTING
 
         # Step 5: Hotspot Forwarding (Clamp IPv6 TCP MSS)
