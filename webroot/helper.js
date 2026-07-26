@@ -246,7 +246,7 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                 };
                 const nodePcs = c.pcs || settings.pinnedPeerCertSha256;
                 if (nodePcs) {
-                    outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [nodePcs];
+                    outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = nodePcs;
                 }
             }
 
@@ -348,7 +348,7 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                     };
                     const nodePcs = p.get('pcs') || settings.pinnedPeerCertSha256;
                     if (nodePcs) {
-                        outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [nodePcs];
+                        outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = nodePcs;
                     }
                 }
             }
@@ -489,7 +489,7 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                             };
                             const nodePcs = ssParams.get('pcs') || settings.pinnedPeerCertSha256;
                             if (nodePcs) {
-                                outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [nodePcs];
+                                outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = nodePcs;
                             }
                         }
                     }
@@ -577,7 +577,7 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                                     // "allowInsecure" was removed by Xray-core; never emit it into config.json.
                                 };
                                 if (settings.pinnedPeerCertSha256) {
-                                    outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [settings.pinnedPeerCertSha256];
+                                    outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = settings.pinnedPeerCertSha256;
                                 }
                             }
                             if (pluginNet === 'ws') {
