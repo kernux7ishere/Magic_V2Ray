@@ -72,6 +72,9 @@ const i18n = {
         lbl_sid: "Short ID (Reality)",
         lbl_spx: "SpiderX (Reality)",
         lbl_pqv: "Post-Quantum Verify (pqv)",
+        lbl_allowinsecure: "Allow Insecure",
+        lbl_pcs: "Pinned Cert SHA256",
+        lbl_ech: "ECH Config List",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -339,6 +342,9 @@ const i18n = {
         lbl_sid: "Short ID（Reality）",
         lbl_spx: "SpiderX（Reality）",
         lbl_pqv: "抗量子验证（pqv）",
+        lbl_allowinsecure: "允许不安全连接",
+        lbl_pcs: "固定证书 SHA256",
+        lbl_ech: "ECH 配置列表",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -606,6 +612,9 @@ const i18n = {
         lbl_sid: "Short ID（Reality）",
         lbl_spx: "SpiderX（Reality）",
         lbl_pqv: "抗量子驗證（pqv）",
+        lbl_allowinsecure: "允許不安全連線",
+        lbl_pcs: "固定憑證 SHA256",
+        lbl_ech: "ECH 設定清單",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",
@@ -873,6 +882,9 @@ const i18n = {
         lbl_sid: "Mã định danh ngắn (Short ID)",
         lbl_spx: "SpiderX (Reality)",
         lbl_pqv: "Xác minh hậu lượng tử (pqv)",
+        lbl_allowinsecure: "Cho phép không an toàn",
+        lbl_pcs: "Chứng chỉ ghim SHA256",
+        lbl_ech: "Danh sách cấu hình ECH",
 
         // TCP HTTP header
         lbl_tcp_http_host: "HTTP Host",

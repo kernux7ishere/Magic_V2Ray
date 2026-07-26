@@ -824,6 +824,9 @@ function getFullNodeDetails(node) {
         shortId: "",
         spiderX: "",
         pqv: "",
+        allowInsecure: false,
+        pcs: "",
+        ech: "",
         alterId: "0",
         headerType: "none",
         // WireGuard
@@ -859,6 +862,9 @@ function getFullNodeDetails(node) {
             d.security = c.tls || "none";
             d.sni = c.sni || "";
             d.alpn = c.alpn || "";
+            d.allowInsecure = c.allowInsecure === true || c.allowInsecure === "1" || c.allowInsecure === 1;
+            d.pcs = c.pcs || "";
+            d.ech = c.ech || "";
             d.alterId = c.aid !== undefined ? String(c.aid) : "0";
             d.headerType = c.type || "none";
             // Per-network fields
@@ -907,6 +913,9 @@ function getFullNodeDetails(node) {
             d.sni = p.get('sni') || '';
             d.alpn = p.get('alpn') || '';
             d.fingerprint = p.get('fp') || 'chrome';
+            d.allowInsecure = p.get('insecure') === '1' || p.get('allowInsecure') === '1' || p.get('allowInsecure') === 'true';
+            d.pcs = p.get('pcs') || '';
+            d.ech = p.get('ech') || '';
 
             // Per-network fields
             if (d.network === 'tcp') {
@@ -993,6 +1002,9 @@ function getFullNodeDetails(node) {
                     d.sni = p.get('sni') || '';
                     d.alpn = p.get('alpn') || '';
                     d.fingerprint = p.get('fp') || 'chrome';
+                    d.allowInsecure = p.get('insecure') === '1' || p.get('allowInsecure') === '1' || p.get('allowInsecure') === 'true';
+                    d.pcs = p.get('pcs') || '';
+                    d.ech = p.get('ech') || '';
 
                     if (d.network === 'tcp') {
                         d.tcpHeaderType = p.get('headerType') || 'none';
@@ -1127,6 +1139,11 @@ function serializeNodeDetailsToUri(d, protocol) {
             if (d.alpn) params.set('alpn', d.alpn);
             if (d.fingerprint) params.set('fp', d.fingerprint);
         }
+        if (d.security === 'tls') {
+            if (d.allowInsecure) params.set('insecure', '1');
+            if (d.pcs) params.set('pcs', d.pcs);
+            if (d.ech) params.set('ech', d.ech);
+        }
         if (d.network === 'tcp' && d.tcpHeaderType && d.tcpHeaderType !== 'none') {
             params.set('headerType', d.tcpHeaderType);
             if (d.tcpHeaderType === 'http') {
@@ -1237,6 +1254,11 @@ function serializeNodeDetailsToUri(d, protocol) {
             alpn: d.security === 'tls' ? d.alpn : "",
             type: "none", host: "", path: ""
         };
+        if (d.security === 'tls') {
+            if (d.allowInsecure) c.allowInsecure = true;
+            if (d.pcs) c.pcs = d.pcs;
+            if (d.ech) c.ech = d.ech;
+        }
         if (d.network === 'tcp') {
             c.type = d.tcpHeaderType || "none";
             if (d.tcpHeaderType === 'http') { c.host = d.tcpHttpHost; c.path = d.tcpHttpPath; }
@@ -1270,6 +1292,11 @@ function serializeNodeDetailsToUri(d, protocol) {
             if (d.sni) params.set('sni', d.sni);
             if (d.alpn) params.set('alpn', d.alpn);
             if (d.fingerprint) params.set('fp', d.fingerprint);
+        }
+        if (d.security === 'tls') {
+            if (d.allowInsecure) params.set('insecure', '1');
+            if (d.pcs) params.set('pcs', d.pcs);
+            if (d.ech) params.set('ech', d.ech);
         }
         // Per-network params
         if (d.network === 'tcp' && d.tcpHeaderType && d.tcpHeaderType !== 'none') {
@@ -1405,6 +1432,9 @@ function _populateEditModal(node, isNew = false) {
     document.getElementById('edit-sni').value = d.sni;
     document.getElementById('edit-fingerprint').value = d.fingerprint;
     document.getElementById('edit-alpn').value = d.alpn;
+    document.getElementById('edit-allowinsecure').checked = !!d.allowInsecure;
+    document.getElementById('edit-pcs').value = d.pcs || '';
+    document.getElementById('edit-ech').value = d.ech || '';
     document.getElementById('edit-pbk').value = d.publicKey;
     document.getElementById('edit-sid').value = d.shortId;
     document.getElementById('edit-spx').value = d.spiderX || '';
@@ -1502,6 +1532,7 @@ function updateEditFormVisibility() {
 
     // Security subfields
     document.getElementById('subfields-tls').style.display = (sec === 'tls' || sec === 'reality') ? 'flex' : 'none';
+    document.getElementById('subfields-tls-only').style.display = (sec === 'tls') ? 'flex' : 'none';
     document.getElementById('subfields-reality').style.display = (sec === 'reality') ? 'flex' : 'none';
 
     // Flow: vless only with tls or reality
@@ -1558,6 +1589,9 @@ function _collectEditFormData() {
         sni: document.getElementById('edit-sni').value.trim(),
         fingerprint: document.getElementById('edit-fingerprint').value,
         alpn: document.getElementById('edit-alpn').value.trim(),
+        allowInsecure: document.getElementById('edit-allowinsecure').checked,
+        pcs: document.getElementById('edit-pcs').value.trim(),
+        ech: document.getElementById('edit-ech').value.trim(),
         publicKey: document.getElementById('edit-pbk').value.trim(),
         shortId: document.getElementById('edit-sid').value.trim(),
         spiderX: document.getElementById('edit-spx').value.trim(),

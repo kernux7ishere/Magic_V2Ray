@@ -690,6 +690,23 @@
                     </div>
                 </div>
 
+                <div id="subfields-tls-only" class="conditional-fields">
+                    <div class="edit-item-field">
+                        <div class="setting-item-row toggle-row">
+                            <label data-i18n="lbl_allowinsecure">Allow Insecure</label>
+                            <input type="checkbox" id="edit-allowinsecure">
+                        </div>
+                    </div>
+                    <div class="edit-item-field">
+                        <label data-i18n="lbl_pcs">Pinned Cert SHA256</label>
+                        <input type="text" id="edit-pcs" placeholder="base64 or hex sha256">
+                    </div>
+                    <div class="edit-item-field">
+                        <label data-i18n="lbl_ech">ECH Config List</label>
+                        <input type="text" id="edit-ech" placeholder="base64 echConfigList">
+                    </div>
+                </div>
+
                 <div id="subfields-reality" class="conditional-fields">
                     <div class="edit-item-field">
                         <label data-i18n="lbl_pbk">Public Key</label>
