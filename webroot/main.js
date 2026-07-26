@@ -2093,6 +2093,7 @@ function bindSettingsToFormView() {
     toggleSubSettingField('set-fragment', 'fragment-sub-fields');
 
     document.getElementById('set-mtu').value = advSettings.mtu || 1350;
+    document.getElementById('set-networkmode').value = advSettings.networkMode ?? 0;
 
     if (!Array.isArray(advSettings.routingRules)) advSettings.routingRules = [];
     renderRoutingRules();
@@ -2123,6 +2124,7 @@ function saveAdvancedSettingsForm(isLangOnly = false) {
     advSettings.fragment_interval = document.getElementById('set-fragment-interval').value || "10-20";
 
     advSettings.mtu = parseInt(document.getElementById('set-mtu').value) || 1350;
+    advSettings.networkMode = parseInt(document.getElementById('set-networkmode').value) || 0;
 
     advSettings.lang = currentLang;
 

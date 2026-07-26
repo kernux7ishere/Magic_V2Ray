@@ -287,6 +287,10 @@ apply_routing_rules() {
     ipv6_enabled="$(query_settings .enableIPv6)"
     echo "IPv6 enabled: $ipv6_enabled"
 
+    network_mode="$(query_settings .networkMode)"
+    [ -z "$network_mode" ] && network_mode=0
+    echo "Network mode: $network_mode"
+
     # Enable IP forward feature
     enable_forward "$ipv6_enabled"
 
@@ -318,9 +322,35 @@ apply_routing_rules() {
     $iptables -t mangle -A XRAY_MARK -d 169.254.0.0/16 -j RETURN       # Link-local
     $iptables -t mangle -A XRAY_MARK -d 224.0.0.0/4 -j RETURN         # Multicast
     $iptables -t mangle -A XRAY_MARK -d 240.0.0.0/4 -j RETURN         # Class E (Reserved)
-    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
-    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
-    $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+
+    # networkMode bypass (see query_settings .networkMode):
+    #   0 = default, everything goes through XRAY_MARK
+    #   1 = WiFi/Ethernet Only -> bypass mobile data interfaces
+    #   2 = Mobile data Only   -> bypass everything except mobile data interfaces
+    if [ "$network_mode" = "1" ]; then
+        $iptables -t mangle -A XRAY_MARK -o rmnet+ -j RETURN
+        $iptables -t mangle -A XRAY_MARK -o ccmni+ -j RETURN
+        $iptables -t mangle -A XRAY_MARK -o pdp+ -j RETURN
+        $iptables -t mangle -A XRAY_MARK -o wwan+ -j RETURN
+
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+    elif [ "$network_mode" = "2" ]; then
+        # Only mark traffic that is BOTH on a mobile interface AND in the
+        # allowed uid range; anything else falls through to the final
+        # RETURN below and bypasses the proxy untouched.
+        for mobile_if in rmnet+ ccmni+ pdp+ wwan+; do
+            $iptables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 1000 -j MARK --set-xmark 1
+            $iptables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 1052 -j MARK --set-xmark 1
+            $iptables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+        done
+        $iptables -t mangle -A XRAY_MARK -j RETURN
+    else
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+        $iptables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+    fi
     $iptables -t mangle -A OUTPUT -j XRAY_MARK
 
     # Step 4: IPv4 + IPv6 Hotspot / Tethering Support
@@ -396,9 +426,29 @@ apply_routing_rules() {
         $ip6tables -t mangle -A XRAY_MARK -d fe80::/10 -j RETURN
         $ip6tables -t mangle -A XRAY_MARK -d fc00::/7 -j RETURN
         $ip6tables -t mangle -A XRAY_MARK -d ff00::/8 -j RETURN
-        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
-        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
-        $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+
+        # networkMode bypass (mirrors IPv4 XRAY_MARK, see above)
+        if [ "$network_mode" = "1" ]; then
+            $ip6tables -t mangle -A XRAY_MARK -o rmnet+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o ccmni+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o pdp+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o wwan+ -j RETURN
+
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+        elif [ "$network_mode" = "2" ]; then
+            for mobile_if in rmnet+ ccmni+ pdp+ wwan+; do
+                $ip6tables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 1000 -j MARK --set-xmark 1
+                $ip6tables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 1052 -j MARK --set-xmark 1
+                $ip6tables -t mangle -A XRAY_MARK -o "$mobile_if" -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+            done
+            $ip6tables -t mangle -A XRAY_MARK -j RETURN
+        else
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1000 -j MARK --set-xmark 1
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 1052 -j MARK --set-xmark 1
+            $ip6tables -t mangle -A XRAY_MARK -m owner --uid-owner 9999-2147483647 -j MARK --set-xmark 1
+        fi
         $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
 
         # Step 4: IPv6 Hotspot / Tethering Support
@@ -419,14 +469,32 @@ apply_routing_rules() {
         $ip6tables -t mangle -I FORWARD 1 -j HOTSPOT_FORWARD
     else
         # Step 1: Disable IPv6 at system level and block via routing rule
-        $ip -6 rule add unreachable priority 1010
+        # (If in mode 1 or 2, we let non-managed interfaces handle IPv6 normally)
+        if [ "$network_mode" != "1" ] && [ "$network_mode" != "2" ]; then
+            $ip -6 rule add unreachable priority 1010
+        fi
 
         # Step 2: Create Mangle chain for local IPv6 output traffic (Drop all IPv6)
         $ip6tables -t mangle -N XRAY_MARK
         # Allow core proxy socket bypass if fwmark is already present
         $ip6tables -t mangle -A XRAY_MARK -m mark --mark $FWMARK -j RETURN
-        # Drop all outgoing IPv6 traffic from local applications
-        $ip6tables -t mangle -A XRAY_MARK -j DROP
+        if [ "$network_mode" = "1" ]; then
+            $ip6tables -t mangle -A XRAY_MARK -o rmnet+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o ccmni+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o pdp+ -j RETURN
+            $ip6tables -t mangle -A XRAY_MARK -o wwan+ -j RETURN
+            # Drop all outgoing IPv6 traffic from local applications
+            $ip6tables -t mangle -A XRAY_MARK -j DROP
+        elif [ "$network_mode" = "2" ]; then
+            $ip6tables -t mangle -A XRAY_MARK -o rmnet+ -j DROP
+            $ip6tables -t mangle -A XRAY_MARK -o ccmni+ -j DROP
+            $ip6tables -t mangle -A XRAY_MARK -o pdp+ -j DROP
+            $ip6tables -t mangle -A XRAY_MARK -o wwan+ -j DROP
+            $ip6tables -t mangle -A XRAY_MARK -j RETURN
+        else
+            # Drop all outgoing IPv6 traffic from local applications
+            $ip6tables -t mangle -A XRAY_MARK -j DROP
+        fi
         $ip6tables -t mangle -A OUTPUT -j XRAY_MARK
 
         # Step 3: Create Mangle chain for IPv6 Hotspot/Tethering traffic (Drop all IPv6)

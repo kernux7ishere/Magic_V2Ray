@@ -17,6 +17,7 @@ let advSettings = {
     routeOnly: false,
     enableIPv6: false,
     preferIpv6: false,
+    networkMode: 0,
     mux: false,
     mux_connections: 8,
     fragment: false,
