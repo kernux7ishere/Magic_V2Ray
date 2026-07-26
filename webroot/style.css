@@ -897,6 +897,24 @@ textarea::placeholder { color: var(--md-outline); }
     box-shadow: 0 0 0 8px rgba(208,188,255,0.12);
 }
 
+/* Removed feature: Allow Insecure (grayed out, struck through, non-interactive) */
+.setting-row-removed {
+    opacity: 0.5;
+}
+.setting-row-removed input[type="checkbox"] {
+    cursor: not-allowed;
+    pointer-events: none;
+}
+.label-strike {
+    text-decoration: line-through;
+}
+.warning-text-danger {
+    color: var(--md-error);
+    font-size: 12px;
+    line-height: 1.4;
+    margin-top: 8px;
+}
+
 /* Sub-setting panel */
 .sub-setting-panel {
     border-top: 1px solid var(--md-outline-variant);

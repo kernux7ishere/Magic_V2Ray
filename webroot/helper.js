@@ -241,7 +241,7 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                 outbound.streamSettings.tlsSettings = {
                     serverName: c.sni || "",
                     alpn: c.alpn ? c.alpn.split(',') : undefined,
-                    ...((c.allowInsecure === true || c.allowInsecure === "1" || c.allowInsecure === 1) ? { allowInsecure: true } : {}),
+                    // "allowInsecure" was removed by Xray-core; never emit it into config.json.
                     ...(c.ech ? { echConfigList: c.ech } : {})
                 };
                 const nodePcs = c.pcs || settings.pinnedPeerCertSha256;
@@ -339,12 +339,11 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                         ...(p.get('pqv') ? { mldsa65Verify: p.get('pqv') } : {})
                     };
                 } else {
-                    const nodeInsecure = p.get('insecure') === '1' || p.get('allowInsecure') === '1' || p.get('allowInsecure') === 'true';
                     outbound.streamSettings.tlsSettings = {
                         serverName: p.get('sni') || "",
                         alpn: p.get('alpn') ? p.get('alpn').split(',') : undefined,
                         fingerprint: p.get('fp') || undefined,
-                        ...(nodeInsecure ? { allowInsecure: true } : {}),
+                        // "allowInsecure" was removed by Xray-core; never emit it into config.json.
                         ...(p.get('ech') ? { echConfigList: p.get('ech') } : {})
                     };
                     const nodePcs = p.get('pcs') || settings.pinnedPeerCertSha256;
@@ -481,12 +480,11 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                                 ...(ssParams.get('pqv') ? { mldsa65Verify: ssParams.get('pqv') } : {})
                             };
                         } else {
-                            const nodeInsecure = ssParams.get('insecure') === '1' || ssParams.get('allowInsecure') === '1' || ssParams.get('allowInsecure') === 'true';
                             outbound.streamSettings.tlsSettings = {
                                 serverName: ssParams.get('sni') || "",
                                 alpn: ssParams.get('alpn') ? ssParams.get('alpn').split(',') : undefined,
                                 fingerprint: ssParams.get('fp') || undefined,
-                                ...(nodeInsecure ? { allowInsecure: true } : {}),
+                                // "allowInsecure" was removed by Xray-core; never emit it into config.json.
                                 ...(ssParams.get('ech') ? { echConfigList: ssParams.get('ech') } : {})
                             };
                             const nodePcs = ssParams.get('pcs') || settings.pinnedPeerCertSha256;
@@ -575,8 +573,8 @@ function convert_uri_to_xray_json(uri, optional_settings) {
                             if (pOpts.tls) {
                                 outbound.streamSettings.security = 'tls';
                                 outbound.streamSettings.tlsSettings = {
-                                    serverName: pOpts.host || ssHost,
-                                    ...(pOpts.allowinsecure ? { allowInsecure: true } : {})
+                                    serverName: pOpts.host || ssHost
+                                    // "allowInsecure" was removed by Xray-core; never emit it into config.json.
                                 };
                                 if (settings.pinnedPeerCertSha256) {
                                     outbound.streamSettings.tlsSettings.pinnedPeerCertSha256 = [settings.pinnedPeerCertSha256];

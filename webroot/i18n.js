@@ -80,6 +80,7 @@ const i18n = {
         lbl_spx: "SpiderX (Reality)",
         lbl_pqv: "Post-quantum verify (pqv)",
         lbl_allowinsecure: "Allow insecure",
+        warn_allowinsecure_removed: "Removed by Xray-core and no longer usable. It will never be written into the config, even if an imported link has allowInsecure=true.",
         lbl_pcs: "Pinned cert SHA256",
         lbl_ech: "ECH config list",
 
@@ -357,6 +358,7 @@ const i18n = {
         lbl_spx: "SpiderX（Reality）",
         lbl_pqv: "抗量子验证（pqv）",
         lbl_allowinsecure: "允许不安全连接",
+        warn_allowinsecure_removed: "该选项已被 Xray-core 移除，无法再使用。即使导入的链接中包含 allowInsecure=true，也绝不会写入配置文件。",
         lbl_pcs: "固定证书 SHA256",
         lbl_ech: "ECH 配置列表",
 
@@ -634,6 +636,7 @@ const i18n = {
         lbl_spx: "SpiderX（Reality）",
         lbl_pqv: "抗量子驗證（pqv）",
         lbl_allowinsecure: "允許不安全連線",
+        warn_allowinsecure_removed: "此選項已被 Xray-core 移除，無法再使用。即使匯入的連結含有 allowInsecure=true，也絕不會寫入設定檔。",
         lbl_pcs: "固定憑證 SHA256",
         lbl_ech: "ECH 設定清單",
 
@@ -911,6 +914,7 @@ const i18n = {
         lbl_spx: "SpiderX (Reality)",
         lbl_pqv: "Xác minh hậu lượng tử (pqv)",
         lbl_allowinsecure: "Cho phép không an toàn",
+        warn_allowinsecure_removed: "Tùy chọn này đã bị Xray-core loại bỏ và không thể dùng được nữa. Nó sẽ không bao giờ được ghi vào file cấu hình, kể cả khi link nhập vào có allowInsecure=true.",
         lbl_pcs: "Chứng chỉ ghim SHA256",
         lbl_ech: "Danh sách cấu hình ECH",
 

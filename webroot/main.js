@@ -1140,7 +1140,7 @@ function serializeNodeDetailsToUri(d, protocol) {
             if (d.fingerprint) params.set('fp', d.fingerprint);
         }
         if (d.security === 'tls') {
-            if (d.allowInsecure) params.set('insecure', '1');
+            // "allowInsecure" was removed by Xray-core; never emit it into the exported URI.
             if (d.pcs) params.set('pcs', d.pcs);
             if (d.ech) params.set('ech', d.ech);
         }
@@ -1255,7 +1255,7 @@ function serializeNodeDetailsToUri(d, protocol) {
             type: "none", host: "", path: ""
         };
         if (d.security === 'tls') {
-            if (d.allowInsecure) c.allowInsecure = true;
+            // "allowInsecure" was removed by Xray-core; never emit it into the exported vmess link.
             if (d.pcs) c.pcs = d.pcs;
             if (d.ech) c.ech = d.ech;
         }
@@ -1294,7 +1294,7 @@ function serializeNodeDetailsToUri(d, protocol) {
             if (d.fingerprint) params.set('fp', d.fingerprint);
         }
         if (d.security === 'tls') {
-            if (d.allowInsecure) params.set('insecure', '1');
+            // "allowInsecure" was removed by Xray-core; never emit it into the exported URI.
             if (d.pcs) params.set('pcs', d.pcs);
             if (d.ech) params.set('ech', d.ech);
         }
@@ -1589,7 +1589,8 @@ function _collectEditFormData() {
         sni: document.getElementById('edit-sni').value.trim(),
         fingerprint: document.getElementById('edit-fingerprint').value,
         alpn: document.getElementById('edit-alpn').value.trim(),
-        allowInsecure: document.getElementById('edit-allowinsecure').checked,
+        // "allowInsecure" was removed by Xray-core; always save as false, ignoring the (disabled) checkbox.
+        allowInsecure: false,
         pcs: document.getElementById('edit-pcs').value.trim(),
         ech: document.getElementById('edit-ech').value.trim(),
         publicKey: document.getElementById('edit-pbk').value.trim(),

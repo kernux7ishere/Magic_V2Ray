@@ -704,10 +704,11 @@
 
                 <div id="subfields-tls-only" class="conditional-fields">
                     <div class="edit-item-field">
-                        <div class="setting-item-row toggle-row">
-                            <label data-i18n="lbl_allowinsecure">Allow Insecure</label>
-                            <input type="checkbox" id="edit-allowinsecure">
+                        <div class="setting-item-row toggle-row setting-row-removed">
+                            <label data-i18n="lbl_allowinsecure" class="label-strike">Allow Insecure</label>
+                            <input type="checkbox" id="edit-allowinsecure" disabled>
                         </div>
+                        <div class="warning-text-danger" data-i18n="warn_allowinsecure_removed">This option has been removed by Xray-core and can no longer be used. It will never be written into the config.</div>
                     </div>
                     <div class="edit-item-field">
                         <label data-i18n="lbl_pcs">Pinned Cert SHA256</label>
