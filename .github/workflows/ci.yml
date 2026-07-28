@@ -120,3 +120,25 @@ jobs:
         run: |
           grep -q '^updateJson=https://' module.prop \
             || { echo "::error::updateJson must use https"; exit 1; }
+
+  build:
+    name: Build & Upload Module Zips
+    runs-on: ubuntu-latest
+    needs: [shell, webui, manifest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y zip bash
+
+      - name: Run release packager
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload module ZIP artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: module-zips
+          path: dist/*.zip
+          if-no-files-found: error
