@@ -136,9 +136,23 @@ jobs:
           chmod +x build.sh
           ./build.sh
 
-      - name: Upload module ZIP artifacts
+      - name: Upload arm64-v8a artifact
         uses: actions/upload-artifact@v4
         with:
-          name: module-zips
-          path: dist/*.zip
+          name: magic_v2ray-arm64-v8a
+          path: dist/*-arm64-v8a.zip
+          if-no-files-found: error
+
+      - name: Upload x86_64 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: magic_v2ray-x86_64
+          path: dist/*-x86_64.zip
+          if-no-files-found: error
+
+      - name: Upload universal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: magic_v2ray-universal
+          path: dist/*-universal.zip
           if-no-files-found: error
